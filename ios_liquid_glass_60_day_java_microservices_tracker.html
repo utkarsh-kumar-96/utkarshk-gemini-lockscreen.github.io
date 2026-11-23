@@ -1,0 +1,2882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>60-Day Java Microservices — iOS Liquid Glass Lock Screen</title>
+  <!-- Tailwind CSS for responsive layout & utility classes -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* ==========================================================================
+       1. DESIGN TOKENS & TYPOGRAPHY (Apple SF Pro System Stack)
+       ========================================================================== */
+    :root {
+      --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Inter, sans-serif;
+      --font-text: -apple-system, BlinkMacSystemFont, "SF Pro Text", -apple-system, "Helvetica Neue", Inter, sans-serif;
+
+      /* Liquid Glass Dynamic Material Tokens (Default: Clear) */
+      --glass-bg: linear-gradient(155deg, rgba(255, 255, 255, 0.21) 0%, rgba(255, 255, 255, 0.08) 52%, rgba(255, 255, 255, 0.13) 100%);
+      --glass-bg-subtle: rgba(255, 255, 255, 0.11);
+      --glass-bg-hover: rgba(255, 255, 255, 0.18);
+      --glass-blur: 22px;
+      --glass-saturate: 195%;
+      --glass-brightness: 1.06;
+      --glass-border: rgba(255, 255, 255, 0.30);
+      --glass-rim-top: rgba(255, 255, 255, 0.72);
+      --glass-rim-side: rgba(255, 255, 255, 0.32);
+      --glass-rim-bottom: rgba(255, 255, 255, 0.16);
+      --glass-shadow: 0 18px 42px -12px rgba(0, 0, 0, 0.38), 0 4px 12px -2px rgba(0, 0, 0, 0.20);
+      --glass-sheen-opacity: 0.42;
+      --glass-text-primary: rgba(255, 255, 255, 0.97);
+      --glass-text-secondary: rgba(255, 255, 255, 0.76);
+      --glass-text-muted: rgba(255, 255, 255, 0.56);
+      --sheet-bg: linear-gradient(170deg, rgba(24, 30, 46, 0.74) 0%, rgba(15, 19, 32, 0.84) 100%);
+      --pill-bg: rgba(255, 255, 255, 0.14);
+      --pill-active-bg: rgba(255, 255, 255, 0.92);
+      --pill-active-text: #0b1020;
+    }
+
+    /* Glass Appearance: Tinted (Higher Legibility Frosted Tint) */
+    [data-glass="tinted"] {
+      --glass-bg: linear-gradient(155deg, rgba(22, 26, 38, 0.56) 0%, rgba(16, 20, 32, 0.46) 55%, rgba(26, 32, 48, 0.54) 100%);
+      --glass-bg-subtle: rgba(18, 22, 34, 0.42);
+      --glass-bg-hover: rgba(34, 40, 58, 0.58);
+      --glass-blur: 28px;
+      --glass-saturate: 165%;
+      --glass-brightness: 0.96;
+      --glass-border: rgba(255, 255, 255, 0.22);
+      --glass-rim-top: rgba(255, 255, 255, 0.46);
+      --glass-rim-side: rgba(255, 255, 255, 0.20);
+      --glass-rim-bottom: rgba(255, 255, 255, 0.10);
+      --glass-shadow: 0 20px 44px -12px rgba(0, 0, 0, 0.52), 0 4px 14px -2px rgba(0, 0, 0, 0.30);
+      --glass-sheen-opacity: 0.28;
+      --sheet-bg: linear-gradient(170deg, rgba(16, 20, 32, 0.88) 0%, rgba(10, 13, 22, 0.94) 100%);
+      --pill-bg: rgba(255, 255, 255, 0.12);
+    }
+
+    /* Glass Appearance: Solid / Reduced Transparency (Accessibility Fallback) */
+    [data-glass="solid"] {
+      --glass-bg: linear-gradient(180deg, #1b1f2c 0%, #151822 100%);
+      --glass-bg-subtle: #232838;
+      --glass-bg-hover: #2b3144;
+      --glass-blur: 0px;
+      --glass-saturate: 100%;
+      --glass-brightness: 1;
+      --glass-border: rgba(255, 255, 255, 0.22);
+      --glass-rim-top: rgba(255, 255, 255, 0.24);
+      --glass-rim-side: rgba(255, 255, 255, 0.14);
+      --glass-rim-bottom: rgba(255, 255, 255, 0.08);
+      --glass-shadow: 0 16px 34px -8px rgba(0, 0, 0, 0.65);
+      --glass-sheen-opacity: 0.10;
+      --sheet-bg: #141720;
+      --pill-bg: #262c3d;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: var(--font-text);
+      color: var(--glass-text-primary);
+      background-color: #070910;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ==========================================================================
+       2. DESKTOP STAGE & IPHONE TITANIUM BEZEL
+       ========================================================================== */
+    .desktop-stage {
+      position: relative;
+      width: 100vw;
+      height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: #070910;
+    }
+
+    /* Ambient desktop halo reflecting active wallpaper */
+    .stage-ambient {
+      position: absolute;
+      inset: -20%;
+      opacity: 0.45;
+      filter: blur(110px) saturate(150%);
+      pointer-events: none;
+      transition: background 0.9s ease;
+      z-index: 0;
+    }
+
+    .stage-ambient[data-wp="aurora"] {
+      background: radial-gradient(circle at 30% 28%, #0ea5e9, transparent 48%),
+                  radial-gradient(circle at 72% 70%, #6366f1, transparent 52%);
+    }
+    .stage-ambient[data-wp="pacific"] {
+      background: radial-gradient(circle at 32% 28%, #f43f5e, transparent 48%),
+                  radial-gradient(circle at 70% 72%, #0d9488, transparent 52%);
+    }
+    .stage-ambient[data-wp="solar"] {
+      background: radial-gradient(circle at 30% 25%, #f59e0b, transparent 48%),
+                  radial-gradient(circle at 74% 72%, #ea580c, transparent 52%);
+    }
+    .stage-ambient[data-wp="emerald"] {
+      background: radial-gradient(circle at 30% 28%, #10b981, transparent 48%),
+                  radial-gradient(circle at 74% 72%, #06b6d4, transparent 52%);
+    }
+
+    /* Realistic Titanium iPhone Device Frame (Desktop & Tablet — ~398x836 Inner Viewport) */
+    .iphone-frame {
+      position: relative;
+      z-index: 2;
+      width: min(420px, 94vw);
+      height: min(858px, 94dvh);
+      border-radius: 56px;
+      padding: 11px;
+      background: linear-gradient(145deg, #525763 0%, #262930 22%, #191c22 50%, #3a3f4a 82%, #1f2229 100%);
+      box-shadow:
+        0 35px 90px -15px rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(255, 255, 255, 0.16),
+        inset 0 0 0 1.5px rgba(255, 255, 255, 0.14),
+        inset 0 2px 6px rgba(255, 255, 255, 0.25);
+      transition: transform 0.35s ease;
+    }
+
+    /* Subtle side hardware buttons on desktop */
+    .iphone-frame::before,
+    .iphone-frame::after {
+      content: "";
+      position: absolute;
+      width: 3px;
+      border-radius: 3px;
+      background: linear-gradient(180deg, #5a606d, #2b2f37, #4a4f5a);
+      pointer-events: none;
+    }
+    .iphone-frame::before {
+      left: -3px;
+      top: 170px;
+      height: 54px;
+      box-shadow: 0 70px 0 #3a3f4a, 0 -46px 0 -0.2px #3a3f4a;
+    }
+    .iphone-frame::after {
+      right: -3px;
+      top: 210px;
+      height: 82px;
+    }
+
+    .iphone-screen {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 46px;
+      overflow: hidden;
+      background: #0d162a;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Seamless Full-Bleed Mobile Presentation */
+    @media (max-width: 520px) {
+      .stage-ambient { display: none; }
+      .iphone-frame {
+        width: 100vw;
+        height: 100dvh;
+        max-height: none;
+        border-radius: 0;
+        padding: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+      .iphone-frame::before,
+      .iphone-frame::after {
+        display: none;
+      }
+      .iphone-screen {
+        border-radius: 0;
+        box-shadow: none;
+      }
+    }
+
+    /* ==========================================================================
+       3. BREATHING LUMINOUS WALLPAPERS (Rich Color & Depth for Glass Refraction)
+       ========================================================================== */
+    .wallpaper-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      transition: background 0.8s ease;
+    }
+
+    .wp-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(52px);
+      will-change: transform, opacity;
+      mix-blend-mode: screen;
+      transition: background 0.8s ease;
+    }
+
+    .wp-orb-1 {
+      width: 125%;
+      height: 62%;
+      top: -14%;
+      left: -24%;
+      animation: breatheOrb1 16s ease-in-out infinite alternate;
+    }
+    .wp-orb-2 {
+      width: 115%;
+      height: 58%;
+      top: 22%;
+      right: -30%;
+      animation: breatheOrb2 20s ease-in-out infinite alternate;
+    }
+    .wp-orb-3 {
+      width: 120%;
+      height: 55%;
+      bottom: -16%;
+      left: -14%;
+      animation: breatheOrb3 18s ease-in-out infinite alternate;
+    }
+
+    /* Luminous Caustic Ribbon for Refraction Texture */
+    .wp-ribbon {
+      position: absolute;
+      inset: -15%;
+      opacity: 0.48;
+      filter: blur(26px);
+      animation: driftRibbon 24s ease-in-out infinite alternate;
+      transition: background 0.8s ease;
+    }
+
+    /* Fine optical sheen + vignette for high clock & glass contrast */
+    .wp-vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.12) 0%, transparent 55%),
+        linear-gradient(180deg, rgba(4, 8, 18, 0.24) 0%, rgba(4, 8, 18, 0.06) 38%, rgba(4, 8, 18, 0.34) 100%);
+      pointer-events: none;
+    }
+
+    /* Preset 1: Aurora Sapphire */
+    .wallpaper-layer[data-wp="aurora"] {
+      background: linear-gradient(160deg, #0b1b48 0%, #102a68 38%, #1e1b5c 72%, #091330 100%);
+    }
+    .wallpaper-layer[data-wp="aurora"] .wp-orb-1 {
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.88) 0%, rgba(37, 99, 235, 0.45) 55%, transparent 75%);
+    }
+    .wallpaper-layer[data-wp="aurora"] .wp-orb-2 {
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.78) 0%, rgba(79, 70, 229, 0.42) 55%, transparent 76%);
+    }
+    .wallpaper-layer[data-wp="aurora"] .wp-orb-3 {
+      background: radial-gradient(circle, rgba(45, 212, 191, 0.72) 0%, rgba(14, 165, 233, 0.35) 58%, transparent 78%);
+    }
+    .wallpaper-layer[data-wp="aurora"] .wp-ribbon {
+      background: conic-gradient(from 130deg at 52% 48%, transparent 0deg, rgba(125, 211, 252, 0.45) 70deg, transparent 150deg, rgba(192, 132, 252, 0.38) 245deg, transparent 360deg);
+    }
+
+    /* Preset 2: Pacific Dusk */
+    .wallpaper-layer[data-wp="pacific"] {
+      background: linear-gradient(165deg, #2a143c 0%, #4c1d4b 36%, #183652 74%, #0f1c33 100%);
+    }
+    .wallpaper-layer[data-wp="pacific"] .wp-orb-1 {
+      background: radial-gradient(circle, rgba(251, 113, 133, 0.88) 0%, rgba(244, 63, 94, 0.44) 55%, transparent 75%);
+    }
+    .wallpaper-layer[data-wp="pacific"] .wp-orb-2 {
+      background: radial-gradient(circle, rgba(251, 146, 60, 0.72) 0%, rgba(217, 70, 239, 0.42) 55%, transparent 76%);
+    }
+    .wallpaper-layer[data-wp="pacific"] .wp-orb-3 {
+      background: radial-gradient(circle, rgba(45, 212, 191, 0.74) 0%, rgba(14, 116, 144, 0.45) 58%, transparent 78%);
+    }
+    .wallpaper-layer[data-wp="pacific"] .wp-ribbon {
+      background: conic-gradient(from 80deg at 46% 52%, transparent 0deg, rgba(253, 164, 175, 0.48) 75deg, transparent 170deg, rgba(94, 234, 212, 0.38) 260deg, transparent 360deg);
+    }
+
+    /* Preset 3: Solar Amber */
+    .wallpaper-layer[data-wp="solar"] {
+      background: linear-gradient(160deg, #3c140e 0%, #6d2310 35%, #4a192c 72%, #1d0c16 100%);
+    }
+    .wallpaper-layer[data-wp="solar"] .wp-orb-1 {
+      background: radial-gradient(circle, rgba(251, 191, 36, 0.90) 0%, rgba(245, 158, 11, 0.46) 55%, transparent 75%);
+    }
+    .wallpaper-layer[data-wp="solar"] .wp-orb-2 {
+      background: radial-gradient(circle, rgba(249, 115, 22, 0.84) 0%, rgba(225, 29, 72, 0.45) 55%, transparent 76%);
+    }
+    .wallpaper-layer[data-wp="solar"] .wp-orb-3 {
+      background: radial-gradient(circle, rgba(253, 224, 71, 0.62) 0%, rgba(190, 24, 93, 0.42) 58%, transparent 78%);
+    }
+    .wallpaper-layer[data-wp="solar"] .wp-ribbon {
+      background: conic-gradient(from 200deg at 54% 46%, transparent 0deg, rgba(253, 224, 71, 0.44) 65deg, transparent 160deg, rgba(251, 113, 133, 0.40) 250deg, transparent 360deg);
+    }
+
+    /* Preset 4: Emerald Prism */
+    .wallpaper-layer[data-wp="emerald"] {
+      background: linear-gradient(162deg, #072926 0%, #0d4440 38%, #0f2c4c 74%, #061724 100%);
+    }
+    .wallpaper-layer[data-wp="emerald"] .wp-orb-1 {
+      background: radial-gradient(circle, rgba(52, 211, 153, 0.88) 0%, rgba(16, 185, 129, 0.46) 55%, transparent 75%);
+    }
+    .wallpaper-layer[data-wp="emerald"] .wp-orb-2 {
+      background: radial-gradient(circle, rgba(34, 211, 238, 0.82) 0%, rgba(14, 165, 233, 0.42) 55%, transparent 76%);
+    }
+    .wallpaper-layer[data-wp="emerald"] .wp-orb-3 {
+      background: radial-gradient(circle, rgba(163, 230, 53, 0.56) 0%, rgba(20, 184, 166, 0.42) 58%, transparent 78%);
+    }
+    .wallpaper-layer[data-wp="emerald"] .wp-ribbon {
+      background: conic-gradient(from 40deg at 50% 50%, transparent 0deg, rgba(110, 231, 183, 0.46) 70deg, transparent 165deg, rgba(103, 232, 249, 0.42) 255deg, transparent 360deg);
+    }
+
+    @keyframes breatheOrb1 {
+      0% { transform: translate(0%, 0%) scale(1); }
+      100% { transform: translate(12%, 8%) scale(1.16); }
+    }
+    @keyframes breatheOrb2 {
+      0% { transform: translate(0%, 0%) scale(1.06); }
+      100% { transform: translate(-14%, -9%) scale(0.94); }
+    }
+    @keyframes breatheOrb3 {
+      0% { transform: translate(0%, 0%) scale(1); }
+      100% { transform: translate(10%, -11%) scale(1.14); }
+    }
+    @keyframes driftRibbon {
+      0% { transform: rotate(0deg) scale(1); }
+      100% { transform: rotate(16deg) scale(1.12); }
+    }
+
+    /* ==========================================================================
+       4. APPLE LIQUID GLASS MATERIAL (Multi-Layered Specular & Refraction)
+       ========================================================================== */
+    .liquid-glass {
+      position: relative;
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
+      border: 1px solid var(--glass-border);
+      box-shadow:
+        var(--glass-shadow),
+        inset 0 1px 0.5px var(--glass-rim-top),
+        inset 1px 0 0.5px var(--glass-rim-side),
+        inset -1px 0 0.5px rgba(255, 255, 255, 0.14),
+        inset 0 -1px 1px var(--glass-rim-bottom);
+      transition:
+        transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+        background 0.35s ease,
+        border-color 0.35s ease,
+        box-shadow 0.35s ease;
+      overflow: hidden;
+    }
+
+    /* Interactive Cursor / Touch-Reactive Specular Sheen */
+    .liquid-glass::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(
+        260px circle at var(--mx, 50%) var(--my, 15%),
+        rgba(255, 255, 255, var(--glass-sheen-opacity)),
+        rgba(255, 255, 255, 0.08) 38%,
+        transparent 70%
+      );
+      opacity: var(--sheen-active, 0.45);
+      pointer-events: none;
+      transition: opacity 0.35s ease;
+      z-index: 1;
+    }
+
+    /* Subtle edge lensing / chromatic rim highlight */
+    .liquid-glass::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.18) 0%,
+        rgba(255, 255, 255, 0.02) 22%,
+        transparent 58%,
+        rgba(255, 255, 255, 0.07) 100%
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .liquid-glass > * {
+      position: relative;
+      z-index: 2;
+    }
+
+    .glass-interactive {
+      cursor: pointer;
+    }
+    .glass-interactive:active {
+      transform: scale(0.965);
+    }
+
+    /* Circular Floating Lock Screen Buttons */
+    .glass-fab {
+      width: 52px;
+      height: 52px;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .glass-fab:hover {
+      transform: scale(1.06);
+    }
+    .glass-fab:active {
+      transform: scale(0.91);
+    }
+
+    /* ==========================================================================
+       5. iOS 26 TRANSLUCENT LIQUID GLASS LOCK SCREEN CLOCK
+       ========================================================================== */
+    .glass-clock {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: clamp(58px, 15vw, 76px);
+      line-height: 0.94;
+      letter-spacing: -0.045em;
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.96) 0%,
+        rgba(255, 255, 255, 0.78) 46%,
+        rgba(255, 255, 255, 0.42) 100%
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.24)) drop-shadow(0 1px 0 rgba(255, 255, 255, 0.35));
+      transition: opacity 0.3s ease;
+    }
+
+    [data-glass="solid"] .glass-clock {
+      background: none;
+      color: #ffffff;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
+    }
+
+    /* ==========================================================================
+       6. LOCK SCREEN FLEX VIEWPORT, PASSIVE DYNAMIC ISLAND & SCROLL CONTAINERS
+       ========================================================================== */
+    .lockscreen-viewport {
+      position: relative;
+      z-index: 10;
+      height: 100%;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .dynamic-island {
+      height: 30px;
+      width: 112px;
+      border-radius: 9999px;
+      background: #040507;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    /* Daily Routine Live Activity Card — Strict Flex Scroll Parent */
+    .routine-card {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Sleek Translucent Liquid Glass Scrollbar (Vertical) */
+    .glass-scroll {
+      overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 0;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.42) transparent;
+    }
+    .glass-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+    .glass-scroll::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 9999px;
+      margin: 4px 0;
+    }
+    .glass-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.42);
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.28);
+    }
+    .glass-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    /* Horizontal Translucent Glass Scrollbar (Phase Filter Pills) */
+    .glass-scroll-x {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+    }
+    .glass-scroll-x::-webkit-scrollbar {
+      height: 4px;
+    }
+    .glass-scroll-x::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .glass-scroll-x::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.28);
+      border-radius: 9999px;
+    }
+
+    /* Dedicated Scroll Wrapper & Strictly Scrollable #routineChecklist */
+    .checklist-scroll-wrap {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #routineChecklist {
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
+      padding-right: 6px;
+      padding-bottom: 18px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.42) transparent;
+    }
+    #routineChecklist::-webkit-scrollbar {
+      width: 5px;
+    }
+    #routineChecklist::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 9999px;
+      margin: 2px 0 14px 0;
+    }
+    #routineChecklist::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.44);
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.34);
+    }
+    #routineChecklist::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.68);
+    }
+
+    /* Dynamic Top/Bottom Scroll Fade Cues & Scroll Hint Pill (Zero Pointer Interception) */
+    .scroll-cue-top,
+    .scroll-cue-bottom {
+      position: absolute;
+      left: 0;
+      right: 8px;
+      height: 24px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      z-index: 4;
+    }
+    .scroll-cue-top {
+      top: 0;
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      background: linear-gradient(180deg, rgba(10, 16, 30, 0.42) 0%, transparent 100%);
+    }
+    .scroll-cue-bottom {
+      bottom: 0;
+      height: 36px;
+      border-bottom-left-radius: 16px;
+      border-bottom-right-radius: 16px;
+      background: linear-gradient(0deg, rgba(10, 16, 30, 0.56) 0%, transparent 100%);
+    }
+    .checklist-scroll-wrap.can-scroll-top .scroll-cue-top {
+      opacity: 1;
+    }
+    .checklist-scroll-wrap.can-scroll-bottom .scroll-cue-bottom {
+      opacity: 1;
+    }
+
+    .checklist-scroll-hint {
+      position: absolute;
+      left: 50%;
+      bottom: 4px;
+      transform: translateX(-50%) translateY(6px);
+      z-index: 5;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .checklist-scroll-wrap.can-scroll-bottom .checklist-scroll-hint {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ==========================================================================
+       7. ROUTINE ITEM INTERACTIONS & LIQUID PROGRESS BAR
+       ========================================================================== */
+    .routine-row {
+      position: relative;
+      background: var(--glass-bg-subtle);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 19px;
+      transition:
+        transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+        background 0.25s ease,
+        border-color 0.25s ease;
+      overflow: hidden;
+    }
+
+    .routine-row:hover {
+      background: var(--glass-bg-hover);
+      border-color: rgba(255, 255, 255, 0.24);
+    }
+
+    .routine-row:active {
+      transform: scale(0.98);
+    }
+
+    .routine-row.completed {
+      background: rgba(52, 211, 153, 0.14);
+      border-color: rgba(110, 231, 183, 0.36);
+    }
+
+    [data-glass="solid"] .routine-row.completed {
+      background: #17332b;
+      border-color: rgba(52, 211, 153, 0.55);
+    }
+
+    /* Tactile specular shimmer sweep when checked */
+    .routine-row.just-checked {
+      animation: rowBounce 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .routine-row.just-checked::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg, transparent 15%, rgba(255, 255, 255, 0.45) 48%, transparent 80%);
+      animation: specularSweep 0.65s ease-out forwards;
+      pointer-events: none;
+    }
+
+    @keyframes rowBounce {
+      0% { transform: scale(1); }
+      35% { transform: scale(0.96); }
+      72% { transform: scale(1.018); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes specularSweep {
+      0% { transform: translateX(-110%); opacity: 0.9; }
+      100% { transform: translateX(120%); opacity: 0; }
+    }
+
+    /* Liquid Progress Fill */
+    .liquid-bar-fill {
+      position: relative;
+      height: 100%;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, #38bdf8 0%, #34d399 65%, #a7f3d0 100%);
+      box-shadow: 0 0 14px rgba(52, 211, 153, 0.55);
+      transition: width 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+      overflow: hidden;
+    }
+    .liquid-bar-fill::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+      animation: liquidGlint 2.6s linear infinite;
+    }
+    @keyframes liquidGlint {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(180%); }
+    }
+
+    /* ==========================================================================
+       8. CONCENTRIC LIQUID GLASS MODAL SHEETS
+       ========================================================================== */
+    .sheet-backdrop {
+      position: absolute;
+      inset: 0;
+      z-index: 40;
+      background: rgba(4, 8, 18, 0.42);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 12px;
+    }
+    .sheet-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .glass-sheet {
+      width: 100%;
+      max-height: 82%;
+      min-height: 0;
+      border-radius: 34px;
+      background: var(--sheet-bg);
+      backdrop-filter: blur(32px) saturate(190%);
+      -webkit-backdrop-filter: blur(32px) saturate(190%);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      box-shadow:
+        0 -14px 48px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0.5px rgba(255, 255, 255, 0.50);
+      transform: translateY(108%);
+      transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .glass-sheet.roadmap-sheet {
+      height: 84%;
+      max-height: 84%;
+    }
+    .glass-sheet.settings-sheet {
+      max-height: 80%;
+    }
+    .sheet-backdrop.open .glass-sheet {
+      transform: translateY(0%);
+    }
+
+    /* Scrollable Sheet Container with Subtle Bottom Fade Cue */
+    .scroll-fade-wrap {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .scroll-fade-wrap::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 8px;
+      bottom: 0;
+      height: 30px;
+      background: linear-gradient(180deg, transparent 0%, rgba(12, 16, 28, 0.78) 100%);
+      pointer-events: none;
+      z-index: 3;
+      border-bottom-left-radius: 18px;
+    }
+
+    .roadmap-chevron {
+      transition: transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .roadmap-chevron.expanded {
+      transform: rotate(180deg);
+    }
+
+    /* Toast Notification Pill */
+    .glass-toast {
+      position: absolute;
+      top: 56px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-18px) scale(0.92);
+      z-index: 60;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.36s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .glass-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+
+    /* Custom date input polish for dark glass */
+    input[type="date"] {
+      color-scheme: dark;
+    }
+  </style>
+</head>
+<body data-glass="clear">
+
+  <!-- Desktop Showcase Stage -->
+  <div class="desktop-stage">
+    <!-- Ambient Halo behind iPhone Bezel -->
+    <div id="stageAmbient" class="stage-ambient" data-wp="aurora"></div>
+
+    <!-- iPhone Lock Screen Frame (Full-bleed on Mobile) -->
+    <main class="iphone-frame" aria-label="iPhone Lock Screen 60-Day Java Microservices Tracker">
+      <div class="iphone-screen" id="iphoneScreen">
+
+        <!-- Animated Luminous Wallpaper Layer -->
+        <div id="wallpaperLayer" class="wallpaper-layer" data-wp="aurora" aria-hidden="true">
+          <div class="wp-orb wp-orb-1"></div>
+          <div class="wp-orb wp-orb-2"></div>
+          <div class="wp-orb wp-orb-3"></div>
+          <div class="wp-ribbon"></div>
+          <div class="wp-vignette"></div>
+        </div>
+
+        <!-- Subtle Toast Pill (No alert() / confirm()) -->
+        <div id="glassToast" class="glass-toast liquid-glass rounded-full px-4 py-2 flex items-center gap-2 text-xs font-medium whitespace-nowrap">
+          <span id="toastIcon">✨</span>
+          <span id="toastMessage">Day Complete!</span>
+        </div>
+
+        <!-- ================================================================
+             FULL-HEIGHT FLEX COLUMN LOCK SCREEN VIEWPORT (Non-Overlapping)
+             ================================================================ -->
+        <div class="lockscreen-viewport">
+
+          <!-- a) iOS STATUS BAR & PASSIVE DYNAMIC ISLAND (flex-shrink: 0) -->
+          <header class="relative z-20 flex items-center justify-between px-6 pt-3 pb-1 shrink-0">
+            <!-- Left Status Time -->
+            <div id="statusTime" class="text-[13px] font-semibold tracking-tight tabular-nums w-14">9:41</div>
+
+            <!-- Center Passive Dynamic Island Pill -->
+            <div class="dynamic-island flex items-center justify-end px-3" aria-hidden="true">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#101626] ring-1 ring-white/10"></span>
+            </div>
+
+            <!-- Right iOS Signal / Wi-Fi / Battery -->
+            <div class="flex items-center justify-end gap-1.5 w-14">
+              <!-- Cellular Bars -->
+              <svg class="w-4 h-3 text-white" viewBox="0 0 18 12" fill="currentColor" aria-hidden="true">
+                <rect x="0" y="8" width="2.8" height="4" rx="1"/>
+                <rect x="4.5" y="5.5" width="2.8" height="6.5" rx="1"/>
+                <rect x="9" y="3" width="2.8" height="9" rx="1"/>
+                <rect x="13.5" y="0.5" width="2.8" height="11.5" rx="1"/>
+              </svg>
+              <!-- Wi-Fi -->
+              <svg class="w-3.5 h-3 text-white" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <path d="M1.5 4.2C5.2 0.8 10.8 0.8 14.5 4.2"/>
+                <path d="M4.2 7.2C6.4 5.2 9.6 5.2 11.8 7.2"/>
+                <circle cx="8" cy="10.2" r="1.2" fill="currentColor" stroke="none"/>
+              </svg>
+              <!-- Battery -->
+              <div class="flex items-center gap-[1.5px]">
+                <div class="w-[21px] h-[11px] rounded-[3.5px] border border-white/75 p-[1.5px] flex items-center">
+                  <div class="w-[82%] h-full rounded-[1.5px] bg-white"></div>
+                </div>
+                <div class="w-[1.5px] h-[4px] rounded-r bg-white/75"></div>
+              </div>
+            </div>
+          </header>
+
+          <!-- b) LOCK SCREEN DATE & TRANSLUCENT iOS 26 LIQUID GLASS CLOCK (flex-shrink: 0) -->
+          <section class="shrink-0 text-center px-4 pt-1 pb-1.5 select-none">
+            <div class="inline-flex items-center gap-1.5 text-[13.5px] font-medium tracking-tight text-white/90 drop-shadow-sm">
+              <svg class="w-3.5 h-3.5 text-white/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="5" y="11" width="14" height="10" rx="2.5"></rect>
+                <path d="M8 11V7a4 4 0 0 1 8 0v4"></path>
+              </svg>
+              <span id="lockDateLine">Sunday, November 22</span>
+            </div>
+            <div id="lockClock" class="glass-clock tabular-nums mt-0.5">09:41</div>
+            <div class="text-[10.5px] font-semibold uppercase tracking-[0.22em] text-white/70 mt-1">
+              Java Microservices · 60-Day Sprint
+            </div>
+          </section>
+
+          <!-- c) 60-DAY COUNTDOWN GLASS WIDGET STRIP (flex-shrink: 0) -->
+          <div class="shrink-0 px-4 pb-2.5">
+            <section
+              id="countdownWidget"
+              class="liquid-glass rounded-[28px] px-3.5 py-2.5 flex items-center justify-between gap-2.5"
+              aria-label="60-Day Progress and Live Countdown"
+            >
+              <!-- Left: Circular Progress Ring (Tap to Open Roadmap) -->
+              <button
+                id="ringRoadmapTrigger"
+                type="button"
+                class="flex items-center shrink-0 text-left group focus:outline-none transition active:scale-95"
+                title="Open 60-Day Roadmap"
+                aria-label="Open 60-Day Roadmap"
+              >
+                <div class="relative w-[56px] h-[56px] flex items-center justify-center">
+                  <svg class="w-full h-full -rotate-90" viewBox="0 0 60 60">
+                    <circle
+                      cx="30" cy="30" r="25"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.16)"
+                      stroke-width="4.6"
+                    />
+                    <circle
+                      id="progressRingCircle"
+                      cx="30" cy="30" r="25"
+                      fill="none"
+                      stroke="url(#ringGrad)"
+                      stroke-width="4.6"
+                      stroke-linecap="round"
+                      stroke-dasharray="157.08"
+                      stroke-dashoffset="157.08"
+                      style="transition: stroke-dashoffset 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);"
+                    />
+                    <defs>
+                      <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#38bdf8" />
+                        <stop offset="55%" stop-color="#34d399" />
+                        <stop offset="100%" stop-color="#fde047" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div class="absolute inset-0 flex flex-col items-center justify-center leading-none">
+                    <span id="ringPctText" class="text-[11px] font-bold tabular-nums text-white">0%</span>
+                    <span id="ringDayText" class="text-[8px] font-semibold text-white/75 tabular-nums mt-0.5">Day 1/60</span>
+                  </div>
+                </div>
+              </button>
+
+              <!-- Center: Live 60-Day Countdown Timer -->
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/65 mb-1">
+                  Countdown to Day 60
+                </div>
+                <div class="grid grid-cols-4 gap-1 text-center tabular-nums">
+                  <div class="rounded-[12px] bg-white/10 py-1 px-0.5 border border-white/10">
+                    <div id="cdDays" class="text-[13.5px] font-bold leading-tight text-white">60</div>
+                    <div class="text-[8.5px] uppercase tracking-wider text-white/65">Days</div>
+                  </div>
+                  <div class="rounded-[12px] bg-white/10 py-1 px-0.5 border border-white/10">
+                    <div id="cdHours" class="text-[13.5px] font-bold leading-tight text-white">00</div>
+                    <div class="text-[8.5px] uppercase tracking-wider text-white/65">Hrs</div>
+                  </div>
+                  <div class="rounded-[12px] bg-white/10 py-1 px-0.5 border border-white/10">
+                    <div id="cdMins" class="text-[13.5px] font-bold leading-tight text-white">00</div>
+                    <div class="text-[8.5px] uppercase tracking-wider text-white/65">Min</div>
+                  </div>
+                  <div class="rounded-[12px] bg-white/10 py-1 px-0.5 border border-white/10">
+                    <div id="cdSecs" class="text-[13.5px] font-bold leading-tight text-sky-200">00</div>
+                    <div class="text-[8.5px] uppercase tracking-wider text-white/65">Sec</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Streak & Phase Pills -->
+              <div class="flex flex-col items-end gap-1.5 shrink-0">
+                <div
+                  class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-amber-400/20 border border-amber-300/35 text-[11px] font-bold text-amber-100 tabular-nums"
+                  title="Current Daily Streak"
+                >
+                  <svg class="w-3.5 h-3.5 text-amber-300" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12.7 2.3c.3 2.5-.6 4.4-2.1 5.9-1.4 1.4-2.8 2.8-2.8 5.2 0 2.4 1.9 4.3 4.2 4.3 2.6 0 4.6-2.1 4.6-4.9 0-1.9-.9-3.6-2-4.8.1 1.4-.5 2.5-1.5 3.1.4-2.6-.1-5.8-2.4-8.8.7.1 1.5.5 2 0z"/>
+                    <path d="M12 22c-4.4 0-7.8-3.3-7.8-7.7 0-3.5 2.1-6.2 4.1-8.2 1.5-1.5 2.6-2.8 2.5-4.7 0-.5.5-.8.9-.5 3.1 2.2 5 5.6 5.2 9.1.7-.7 1.1-1.6 1.2-2.6.1-.5.7-.7 1-.3 1.4 1.8 2.1 4.1 2.1 6.5 0 4.7-3.8 8.4-9.2 8.4z" opacity="0.35"/>
+                  </svg>
+                  <span id="streakCount">0</span>
+                </div>
+                <div
+                  id="widgetPhaseBadge"
+                  class="rounded-full px-2.5 py-0.5 bg-white/15 border border-white/20 text-[10px] font-semibold tracking-wide text-white/90"
+                >
+                  Phase 1
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- d) DAILY ROUTINE LIVE ACTIVITY CARD (flex: 1 1 auto; min-height: 0; overflow: hidden) -->
+          <div class="flex-1 min-h-0 px-4 flex flex-col overflow-hidden">
+            <section
+              id="routineCard"
+              class="routine-card liquid-glass rounded-[32px] p-4"
+              aria-label="Daily Routine Live Activity"
+            >
+              <!-- Pinned Card Header (flex-shrink: 0) -->
+              <div class="shrink-0 flex flex-col gap-2.5 pb-2.5 border-b border-white/10">
+                <!-- Top Row: Phase Tag & Day Navigation -->
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <span id="liveActivityDot" class="w-2 h-2 rounded-full bg-sky-300 shadow-[0_0_8px_#38bdf8] shrink-0"></span>
+                    <span id="cardPhaseLabel" class="text-[10.5px] font-bold uppercase tracking-[0.14em] text-sky-200 truncate">
+                      Phase 1 · Foundations
+                    </span>
+                  </div>
+
+                  <!-- Quick Day Navigation Controls -->
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button
+                      id="prevDayBtn"
+                      type="button"
+                      class="w-7 h-7 rounded-full bg-white/12 hover:bg-white/22 border border-white/18 flex items-center justify-center transition active:scale-90"
+                      aria-label="Previous Day"
+                    >
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 18l-6-6 6-6"/>
+                      </svg>
+                    </button>
+                    <button
+                      id="todayBtn"
+                      type="button"
+                      class="h-7 px-2.5 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-[10.5px] font-semibold tracking-wide transition active:scale-90"
+                    >
+                      Today
+                    </button>
+                    <button
+                      id="nextDayBtn"
+                      type="button"
+                      class="w-7 h-7 rounded-full bg-white/12 hover:bg-white/22 border border-white/18 flex items-center justify-center transition active:scale-90"
+                      aria-label="Next Day"
+                    >
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 18l6-6-6-6"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Day Badge, Scroll Indicator Badge, Topic Title & Goal -->
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5">
+                      <span id="cardDayPill" class="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/15 border border-white/20 tabular-nums">
+                        Day 1 / 60
+                      </span>
+                      <span id="cardCompleteBadge" class="hidden items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/25 border border-emerald-300/45 text-emerald-100">
+                        ✓ Done
+                      </span>
+                    </div>
+                    <span
+                      id="scrollTasksBadge"
+                      class="hidden items-center gap-1 text-[9.5px] font-semibold px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-white/75"
+                    >
+                      <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M7 10l5 5 5-5"/>
+                      </svg>
+                      Scroll tasks
+                    </span>
+                  </div>
+                  <h1 id="cardTopicTitle" class="text-[17px] font-bold tracking-tight leading-snug text-white">
+                    Bounded Contexts &amp; Domain-Driven Design
+                  </h1>
+                  <p id="cardGoalText" class="text-[11.5px] leading-snug text-white/75">
+                    Split an e-commerce monolith into Order, Inventory, and Payment bounded contexts with clean boundaries.
+                  </p>
+                </div>
+
+                <!-- Liquid Progress Bar for Today's 4 Routine Slots -->
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between text-[11px] font-semibold">
+                    <span class="text-white/70">Daily Architecture Routine (1h 50m)</span>
+                    <span id="cardProgressLabel" class="tabular-nums text-white/95">0 / 4 Done</span>
+                  </div>
+                  <div class="w-full h-2 rounded-full bg-white/14 overflow-hidden p-[1px]">
+                    <div id="cardLiquidBar" class="liquid-bar-fill" style="width: 0%;"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Strictly Scrollable #routineChecklist Region with Dynamic Top/Bottom Cues -->
+              <div id="checklistScrollWrap" class="checklist-scroll-wrap mt-2.5">
+                <div class="scroll-cue-top" aria-hidden="true"></div>
+
+                <div id="routineChecklist" class="flex flex-col gap-2.5" role="list" aria-label="Daily Routine Tasks">
+                  <!-- Populated dynamically for the selected day -->
+                </div>
+
+                <div class="scroll-cue-bottom" aria-hidden="true"></div>
+
+                <!-- Subtle Bottom Scroll Hint Pill (Fades out when scrolled to bottom) -->
+                <div
+                  id="checklistScrollHint"
+                  class="checklist-scroll-hint inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-950/65 border border-white/20 backdrop-blur-md text-[9.5px] font-semibold text-white/90 shadow-md"
+                  aria-hidden="true"
+                >
+                  <span>More tasks</span>
+                  <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- e) BOTTOM LOCK SCREEN ACTION BAR & HOME INDICATOR (Normal Flex Flow, flex-shrink: 0) -->
+          <footer class="shrink-0 relative z-20 px-6 pt-2.5 pb-2.5 flex flex-col items-center gap-2">
+            <div class="w-full flex items-center justify-between">
+              <!-- Bottom-Left: Customize Appearance & Start Date -->
+              <button
+                id="openCustomizeBtn"
+                type="button"
+                class="liquid-glass glass-fab glass-interactive"
+                aria-label="Customize Wallpaper, Liquid Glass & Start Date"
+                title="Customize Lock Screen"
+              >
+                <svg class="w-[22px] h-[22px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+              </button>
+
+              <!-- Subtle Center Hint -->
+              <div class="text-[10.5px] font-medium tracking-wide text-white/60">
+                Swipe day · Tap Roadmap
+              </div>
+
+              <!-- Bottom-Right: 60-Day Roadmap Modal Sheet -->
+              <button
+                id="openRoadmapBtn"
+                type="button"
+                class="liquid-glass glass-fab glass-interactive"
+                aria-label="Open 60-Day Java Microservices Roadmap"
+                title="60-Day Roadmap"
+              >
+                <svg class="w-[22px] h-[22px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="4"></rect>
+                  <path d="M16 2v4"></path>
+                  <path d="M8 2v4"></path>
+                  <path d="M3 10h18"></path>
+                  <path d="M8 14h.01"></path>
+                  <path d="M12 14h.01"></path>
+                  <path d="M16 14h.01"></path>
+                  <path d="M8 18h.01"></path>
+                  <path d="M12 18h.01"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- iOS Home Indicator -->
+            <div class="w-32 h-[5px] rounded-full bg-white/80"></div>
+          </footer>
+
+        </div>
+
+        <!-- ================================================================
+             SHEET 1: CUSTOMIZE APPEARANCE (Wallpaper, Liquid Glass, Start Date)
+             ================================================================ -->
+        <div id="customizeBackdrop" class="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="customizeTitle">
+          <div class="glass-sheet settings-sheet p-5 gap-4">
+            <!-- Grab Handle & Header -->
+            <div class="flex flex-col items-center gap-2 shrink-0">
+              <div class="w-10 h-1.5 rounded-full bg-white/30"></div>
+              <div class="w-full flex items-center justify-between">
+                <div>
+                  <h2 id="customizeTitle" class="text-[17px] font-bold tracking-tight">Lock Screen Appearance</h2>
+                  <p class="text-[11.5px] text-white/65">iOS Liquid Glass Material &amp; Sprint Schedule</p>
+                </div>
+                <button
+                  type="button"
+                  data-close-sheet="customizeBackdrop"
+                  class="w-8 h-8 rounded-full bg-white/14 hover:bg-white/25 flex items-center justify-center transition active:scale-90"
+                  aria-label="Close Appearance Settings"
+                >
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="glass-scroll flex-1 min-h-0 flex flex-col gap-4 pr-1.5 pb-5">
+              <!-- Liquid Glass Appearance Mode -->
+              <div class="space-y-2">
+                <div class="text-[11px] font-bold uppercase tracking-[0.14em] text-white/65">Liquid Glass Style</div>
+                <div class="grid grid-cols-3 gap-2">
+                  <button type="button" data-set-glass="clear" class="glass-mode-btn rounded-[18px] p-2.5 border border-white/15 bg-white/10 text-center transition active:scale-95">
+                    <div class="text-[12.5px] font-bold">Clear</div>
+                    <div class="text-[10px] text-white/65 mt-0.5">High Refraction</div>
+                  </button>
+                  <button type="button" data-set-glass="tinted" class="glass-mode-btn rounded-[18px] p-2.5 border border-white/15 bg-white/10 text-center transition active:scale-95">
+                    <div class="text-[12.5px] font-bold">Tinted</div>
+                    <div class="text-[10px] text-white/65 mt-0.5">Frosted Tint</div>
+                  </button>
+                  <button type="button" data-set-glass="solid" class="glass-mode-btn rounded-[18px] p-2.5 border border-white/15 bg-white/10 text-center transition active:scale-95">
+                    <div class="text-[12.5px] font-bold">Solid</div>
+                    <div class="text-[10px] text-white/65 mt-0.5">High Contrast</div>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Luminous Wallpaper Selector -->
+              <div class="space-y-2">
+                <div class="text-[11px] font-bold uppercase tracking-[0.14em] text-white/65">Luminous Wallpaper</div>
+                <div class="grid grid-cols-2 gap-2.5">
+                  <button type="button" data-set-wp="aurora" class="wp-choice-btn rounded-[20px] p-2 border border-white/18 bg-white/10 flex items-center gap-2.5 text-left transition active:scale-95">
+                    <span class="w-10 h-10 rounded-[13px] shrink-0 shadow-inner" style="background: linear-gradient(135deg, #38bdf8, #4f46e5, #0f172a);"></span>
+                    <div class="min-w-0">
+                      <div class="text-[12.5px] font-bold truncate">Aurora Sapphire</div>
+                      <div class="text-[10px] text-white/65">Cyan &amp; Indigo</div>
+                    </div>
+                  </button>
+                  <button type="button" data-set-wp="pacific" class="wp-choice-btn rounded-[20px] p-2 border border-white/18 bg-white/10 flex items-center gap-2.5 text-left transition active:scale-95">
+                    <span class="w-10 h-10 rounded-[13px] shrink-0 shadow-inner" style="background: linear-gradient(135deg, #fb7185, #a855f7, #0d9488);"></span>
+                    <div class="min-w-0">
+                      <div class="text-[12.5px] font-bold truncate">Pacific Dusk</div>
+                      <div class="text-[10px] text-white/65">Coral &amp; Teal</div>
+                    </div>
+                  </button>
+                  <button type="button" data-set-wp="solar" class="wp-choice-btn rounded-[20px] p-2 border border-white/18 bg-white/10 flex items-center gap-2.5 text-left transition active:scale-95">
+                    <span class="w-10 h-10 rounded-[13px] shrink-0 shadow-inner" style="background: linear-gradient(135deg, #fbbf24, #ea580c, #881337);"></span>
+                    <div class="min-w-0">
+                      <div class="text-[12.5px] font-bold truncate">Solar Amber</div>
+                      <div class="text-[10px] text-white/65">Gold &amp; Crimson</div>
+                    </div>
+                  </button>
+                  <button type="button" data-set-wp="emerald" class="wp-choice-btn rounded-[20px] p-2 border border-white/18 bg-white/10 flex items-center gap-2.5 text-left transition active:scale-95">
+                    <span class="w-10 h-10 rounded-[13px] shrink-0 shadow-inner" style="background: linear-gradient(135deg, #34d399, #06b6d4, #064e3b);"></span>
+                    <div class="min-w-0">
+                      <div class="text-[12.5px] font-bold truncate">Emerald Prism</div>
+                      <div class="text-[10px] text-white/65">Mint &amp; Borealis</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 60-Day Start Date Configuration -->
+              <div class="space-y-2">
+                <div class="text-[11px] font-bold uppercase tracking-[0.14em] text-white/65">60-Day Sprint Start Date</div>
+                <div class="rounded-[20px] bg-white/10 border border-white/15 p-3 flex flex-col gap-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <label for="startDateInput" class="text-[12px] font-medium text-white/85">Day 1 Begins On</label>
+                    <input
+                      id="startDateInput"
+                      type="date"
+                      class="rounded-[12px] bg-black/35 border border-white/20 px-2.5 py-1.5 text-[12px] font-semibold text-white focus:outline-none focus:border-sky-300"
+                    />
+                  </div>
+                  <div class="flex items-center justify-between text-[11px] text-white/65">
+                    <span>Target Day 60 Finish:</span>
+                    <span id="targetEndDateLabel" class="font-semibold text-white/90 tabular-nums">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Inline Two-Tap Progress Reset (Zero alert()/confirm()) -->
+              <div class="pt-1 flex items-center justify-between gap-2">
+                <button
+                  id="resetStartTodayBtn"
+                  type="button"
+                  class="flex-1 py-2.5 px-3 rounded-[16px] bg-white/12 hover:bg-white/20 border border-white/15 text-[12px] font-semibold transition active:scale-95"
+                >
+                  Start Today
+                </button>
+                <button
+                  id="resetProgressBtn"
+                  type="button"
+                  class="flex-1 py-2.5 px-3 rounded-[16px] bg-rose-500/20 hover:bg-rose-500/32 border border-rose-400/35 text-rose-200 text-[12px] font-semibold transition active:scale-95"
+                >
+                  Reset Progress
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             SHEET 2: 60-DAY JAVA MICROSERVICES ROADMAP MODAL
+             ================================================================ -->
+        <div id="roadmapBackdrop" class="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="roadmapTitle">
+          <div class="glass-sheet roadmap-sheet p-5 gap-3">
+            <!-- Grab Handle & Header -->
+            <div class="flex flex-col items-center gap-2 shrink-0">
+              <div class="w-10 h-1.5 rounded-full bg-white/30"></div>
+              <div class="w-full flex items-center justify-between">
+                <div>
+                  <h2 id="roadmapTitle" class="text-[17px] font-bold tracking-tight">60-Day Architecture Roadmap</h2>
+                  <p id="roadmapStatsSummary" class="text-[11.5px] text-white/65 tabular-nums">0 of 60 days mastered · 0/240 tasks</p>
+                </div>
+                <button
+                  type="button"
+                  data-close-sheet="roadmapBackdrop"
+                  class="w-8 h-8 rounded-full bg-white/14 hover:bg-white/25 flex items-center justify-center transition active:scale-90"
+                  aria-label="Close Roadmap"
+                >
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Horizontally Scrollable Phase Filter Pills -->
+            <div id="phaseFilterBar" class="glass-scroll-x flex items-center gap-1.5 pb-1.5 shrink-0">
+              <!-- Populated dynamically -->
+            </div>
+
+            <!-- Scroll Cue & Expand/Collapse Tasks Toolbar -->
+            <div class="flex items-center justify-between gap-2 px-1 shrink-0">
+              <span id="roadmapScrollHint" class="text-[10.5px] font-medium text-white/65 tabular-nums">
+                Showing 60 days • Scroll for more
+              </span>
+              <button
+                id="toggleExpandAllBtn"
+                type="button"
+                class="px-2.5 py-1 rounded-full bg-white/12 hover:bg-white/22 border border-white/18 text-[10.5px] font-semibold text-white/90 transition active:scale-95 shrink-0"
+              >
+                Expand Tasks
+              </button>
+            </div>
+
+            <!-- Scrollable Phases & 60 Day Rows with Inline Expandable Tasks -->
+            <div class="scroll-fade-wrap">
+              <div id="roadmapList" class="glass-scroll flex-1 min-h-0 flex flex-col gap-3 pr-1.5 pb-9">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ========================================================================
+       APPLICATION LOGIC & COMPLETE 60-DAY JAVA MICROSERVICES CURRICULUM
+       ======================================================================== -->
+  <script>
+    (function () {
+      "use strict";
+
+      /* ----------------------------------------------------------------------
+         1. PHASE METADATA, ROUTINE SLOTS & 60-DAY JAVA MICROSERVICES CURRICULUM
+         ---------------------------------------------------------------------- */
+      const PHASES = [
+        { id: 1, name: "Microservices Foundations, DDD & Contracts", short: "Foundations", range: "Days 1–10", accent: "text-sky-200", dot: "bg-sky-300" },
+        { id: 2, name: "Spring Cloud, Discovery, Gateway & Edge", short: "Edge Routing", range: "Days 11–20", accent: "text-indigo-200", dot: "bg-indigo-300" },
+        { id: 3, name: "Event-Driven Architecture & Apache Kafka", short: "Apache Kafka", range: "Days 21–30", accent: "text-fuchsia-200", dot: "bg-fuchsia-300" },
+        { id: 4, name: "Distributed Data, Saga, CQRS & Redis", short: "Distributed Data", range: "Days 31–40", accent: "text-amber-200", dot: "bg-amber-300" },
+        { id: 5, name: "Resilience, OAuth2/JWT & OpenTelemetry", short: "Resilience & Ops", range: "Days 41–50", accent: "text-emerald-200", dot: "bg-emerald-300" },
+        { id: 6, name: "Docker, Kubernetes, CI/CD & Capstone", short: "Cloud-Native", range: "Days 51–60", accent: "text-cyan-200", dot: "bg-cyan-300" }
+      ];
+
+      const ROUTINE_SLOTS = [
+        {
+          key: "concept",
+          label: "Concept",
+          duration: "30m",
+          subDetail: "Deep-dive architecture principles, system invariants & trade-offs",
+          badgeClass: "bg-sky-400/20 text-sky-200 border-sky-300/30"
+        },
+        {
+          key: "lab",
+          label: "Java/Spring Lab",
+          duration: "45m",
+          subDetail: "Hands-on Spring Boot 3 / Java 21 coding, config & integration run",
+          badgeClass: "bg-indigo-400/20 text-indigo-200 border-indigo-300/30"
+        },
+        {
+          key: "failure",
+          label: "Failure Modes",
+          duration: "20m",
+          subDetail: "Stress-test timeouts, partial outages, retries & edge-case recovery",
+          badgeClass: "bg-amber-400/20 text-amber-200 border-amber-300/30"
+        },
+        {
+          key: "commit",
+          label: "Git Commit & Notes",
+          duration: "15m",
+          subDetail: "Push tested code, update ADR log & capture key production takeaways",
+          badgeClass: "bg-emerald-400/20 text-emerald-200 border-emerald-300/30"
+        }
+      ];
+
+      /** Complete 60-Day Production Java 21 & Spring Boot 3 Microservices Curriculum */
+      const CURRICULUM = [
+        // ==================== PHASE 1: FOUNDATIONS, DDD & CONTRACTS (DAYS 1-10) ====================
+        {
+          day: 1, phase: 1,
+          title: "Bounded Contexts & Domain-Driven Design",
+          goal: "Split an e-commerce monolith into Order, Inventory, and Payment bounded contexts with clean boundaries.",
+          concept: "Study Strategic DDD: Ubiquitous Language, Bounded Contexts, and Context Mapping patterns.",
+          lab: "Scaffold a multi-module Maven workspace in Java 21 with independent order-service and inventory-service modules.",
+          failure: "Map risks of shared database tables and cyclic domain dependencies across bounded contexts.",
+          commit: "Commit workspace skeleton and ADR-001 documenting bounded context ownership."
+        },
+        {
+          day: 2, phase: 1,
+          title: "Hexagonal Architecture (Ports & Adapters)",
+          goal: "Isolate core Java business rules from Spring Web, JPA, and external infrastructure adapters.",
+          concept: "Review Ports & Adapters vs. layered architecture and how Dependency Inversion protects domain logic.",
+          lab: "Refactor order-service into domain, application (use cases/ports), and infrastructure (REST/JPA adapters).",
+          failure: "Write an ArchUnit test that fails the build if domain classes import org.springframework or jakarta.persistence.",
+          commit: "Push hexagonal refactor with passing ArchUnit guardrails and package diagram."
+        },
+        {
+          day: 3, phase: 1,
+          title: "Spring Boot 3 & Java 21 Virtual Threads",
+          goal: "Harness Project Loom Virtual Threads and Java 21 Records for concise, high-throughput services.",
+          concept: "Compare platform thread pools vs. Virtual Threads, carrier threads, and synchronized pinning pitfalls.",
+          lab: "Enable spring.threads.virtual.enabled=true and model DTOs/events with immutable Java Records and sealed interfaces.",
+          failure: "Simulate blocking I/O and detect thread pinning using -Djdk.tracePinnedThreads=full.",
+          commit: "Commit Virtual Thread benchmarks and notes on when to prefer ReentrantLock over synchronized."
+        },
+        {
+          day: 4, phase: 1,
+          title: "API-First Design with OpenAPI 3.1",
+          goal: "Design versioned REST contracts before writing controllers to decouple producer and consumer teams.",
+          concept: "Study REST maturity, resource modeling, HTTP semantics, and URI vs. header API versioning.",
+          lab: "Author order-api.yaml and auto-generate Spring interfaces & DTOs via openapi-generator-maven-plugin.",
+          failure: "Test breaking vs. backward-compatible contract changes (e.g., removing fields vs. adding optional fields).",
+          commit: "Push OpenAPI specification, generated contract bindings, and Swagger UI verification."
+        },
+        {
+          day: 5, phase: 1,
+          title: "RFC 9457 Problem Details & Validation",
+          goal: "Standardize structured error responses and Bean Validation across all microservice endpoints.",
+          concept: "Learn RFC 9457 ProblemDetail, @ControllerAdvice, and fail-fast input validation boundaries.",
+          lab: "Implement a global RestExceptionHandler returning ProblemDetail with correlationId and field violation maps.",
+          failure: "Verify malformed JSON, constraint violations, and unexpected 500s never leak stack traces or internal SQL.",
+          commit: "Commit reusable error-handling starter module and MockMvc negative-case tests."
+        },
+        {
+          day: 6, phase: 1,
+          title: "Database-per-Service & Flyway Migrations",
+          goal: "Give each microservice an isolated PostgreSQL schema managed with repeatable versioned migrations.",
+          concept: "Understand schema isolation, expand-and-contract migrations, and zero-downtime DDL rules.",
+          lab: "Configure PostgreSQL via Docker Compose and add Flyway V1/V2 scripts for order-service and inventory-service.",
+          failure: "Practice recovering from a failed migration checksum mismatch and testing backward-compatible column renames.",
+          commit: "Push Flyway migration scripts and ADR-002 on zero-downtime schema evolution."
+        },
+        {
+          day: 7, phase: 1,
+          title: "Synchronous Clients: RestClient & Declarative HTTP",
+          goal: "Replace legacy RestTemplate with Spring Boot 3 RestClient and @HttpExchange declarative interfaces.",
+          concept: "Compare RestClient, WebClient, and OpenFeign; study connection pooling, connect vs. read timeouts.",
+          lab: "Build an InventoryHttpClient using @HttpExchange backed by RestClient with explicit Apache HttpClient 5 pooling.",
+          failure: "Inject a 5-second downstream delay via WireMock and verify strict read timeouts prevent thread exhaustion.",
+          commit: "Commit typed HTTP client config, timeout properties, and WireMock latency tests."
+        },
+        {
+          day: 8, phase: 1,
+          title: "High-Performance gRPC & Protocol Buffers",
+          goal: "Use binary Protobuf contracts over HTTP/2 for low-latency internal service-to-service RPCs.",
+          concept: "Study Protobuf wire encoding, HTTP/2 multiplexing, deadlines, and unary vs. streaming RPCs.",
+          lab: "Define inventory.proto and implement a gRPC server in inventory-service called from order-service.",
+          failure: "Test gRPC deadline propagation and UNAVAILABLE status handling when the inventory server restarts.",
+          commit: "Push .proto definitions, gRPC client/server code, and REST vs. gRPC latency notes."
+        },
+        {
+          day: 9, phase: 1,
+          title: "Consumer-Driven Contract Testing",
+          goal: "Catch breaking API changes at build time without spinning up brittle end-to-end environments.",
+          concept: "Learn Spring Cloud Contract / Pact workflow: consumer expectations, stub runner, and provider verification.",
+          lab: "Write Groovy/YAML contracts for inventory reservation and verify stubs inside order-service unit tests.",
+          failure: "Intentionally rename a response JSON field on the provider and observe the contract test catching it.",
+          commit: "Commit contract definitions, stub generation setup, and CI verification notes."
+        },
+        {
+          day: 10, phase: 1,
+          title: "Testcontainers Integration Testing & Phase 1 Review",
+          goal: "Run realistic microservice integration tests against ephemeral PostgreSQL containers.",
+          concept: "Review Testcontainers lifecycle, @ServiceConnection in Spring Boot 3.1+, and the testing pyramid.",
+          lab: "Add @Testcontainers integration tests for order-service repositories, Flyway migrations, and REST endpoints.",
+          failure: "Verify test isolation by running suites in parallel without port collisions or leaking state.",
+          commit: "Tag v1.0-phase1 and publish a Phase 1 retrospective summarizing core design patterns."
+        },
+
+        // ==================== PHASE 2: SPRING CLOUD, DISCOVERY, GATEWAY & EDGE (DAYS 11-20) ====================
+        {
+          day: 11, phase: 2,
+          title: "Externalized Config with Spring Cloud Config",
+          goal: "Centralize environment-specific configuration across all services with Git-backed versioning.",
+          concept: "Study 12-Factor config, Spring Cloud Config Server hierarchy, profiles, and /actuator/refresh.",
+          lab: "Stand up config-server backed by a local Git repo and connect order-service and inventory-service via config.import.",
+          failure: "Test fail-fast startup behavior when config-server is unreachable and verify safe default fallbacks.",
+          commit: "Commit config-server, environment YAML profiles, and configuration precedence notes."
+        },
+        {
+          day: 12, phase: 2,
+          title: "Secrets Management & Dynamic Refresh",
+          goal: "Eliminate plaintext credentials from repositories using Vault or encrypted property stores.",
+          concept: "Compare Spring Cloud Vault, Kubernetes Secrets, KMS envelope encryption, and credential rotation.",
+          lab: "Run HashiCorp Vault in dev mode and inject PostgreSQL credentials into order-service dynamically.",
+          failure: "Simulate secret lease expiration and verify graceful connection pool renewal without downtime.",
+          commit: "Push Vault integration config, local bootstrap script, and ADR-003 on secrets hygiene."
+        },
+        {
+          day: 13, phase: 2,
+          title: "Service Discovery & Client-Side Load Balancing",
+          goal: "Resolve dynamic service instances automatically without hardcoding hostnames or ports.",
+          concept: "Compare Eureka/Consul vs. Kubernetes DNS service discovery and Spring Cloud LoadBalancer strategies.",
+          lab: "Launch a discovery server, run two instances of inventory-service, and balance requests from order-service.",
+          failure: "Kill one inventory-service instance mid-traffic and observe heartbeat eviction and failover timing.",
+          commit: "Commit discovery setup, load-balancer config, and client vs. server-side discovery comparison."
+        },
+        {
+          day: 14, phase: 2,
+          title: "Spring Cloud Gateway: Routing & Predicates",
+          goal: "Expose a unified edge entry point with clean path rewriting, header routing, and version forwarding.",
+          concept: "Study API Gateway architecture, non-blocking Netty vs. Gateway MVC, predicates, and filter chains.",
+          lab: "Create api-gateway routing /api/v1/orders/** and /api/v1/inventory/** to downstream services via lb://.",
+          failure: "Test unknown routes, large payload rejection, and upstream 502/504 mapping at the gateway edge.",
+          commit: "Push api-gateway module with declarative routes and edge routing integration tests."
+        },
+        {
+          day: 15, phase: 2,
+          title: "Custom Gateway Filters & Correlation IDs",
+          goal: "Propagate request trace/correlation headers and enforce cross-cutting edge policies automatically.",
+          concept: "Learn GlobalFilter vs. GatewayFilter, filter ordering, and MDC/context propagation across hops.",
+          lab: "Write a CorrelationIdGlobalFilter that generates or forwards X-Correlation-Id on every request and response.",
+          failure: "Verify correlation IDs survive reactive/virtual-thread hops and error responses returned by downstream services.",
+          commit: "Commit custom gateway filter, logging pattern updates, and header propagation tests."
+        },
+        {
+          day: 16, phase: 2,
+          title: "Distributed Rate Limiting with Redis",
+          goal: "Protect downstream microservices from traffic spikes and noisy neighbors using Token Bucket limits.",
+          concept: "Compare Fixed Window, Sliding Window, Leaky Bucket, and Token Bucket rate-limiting algorithms.",
+          lab: "Configure RequestRateLimiter in api-gateway backed by Redis with custom KeyResolver (API key or IP).",
+          failure: "Flood an endpoint past burstCapacity, assert HTTP 429 Too Many Requests, and test Redis outage fail-open/closed.",
+          commit: "Push Redis rate-limiter config, load test script, and burst/replenish tuning notes."
+        },
+        {
+          day: 17, phase: 2,
+          title: "BFF Pattern & Response Aggregation",
+          goal: "Reduce chatty mobile/web client round-trips with a tailored Backend-for-Frontend aggregation layer.",
+          concept: "Study BFF vs. monolithic gateway anti-patterns and scatter-gather parallel fan-out using StructuredTaskScope.",
+          lab: "Build a /api/v1/order-summary/{id} aggregator fetching Order, Inventory, and Payment data concurrently.",
+          failure: "Simulate slow Payment service and return a partial degraded summary instead of failing the whole request.",
+          commit: "Commit BFF aggregation endpoint and graceful degradation tests."
+        },
+        {
+          day: 18, phase: 2,
+          title: "CORS, Security Headers & TLS Termination",
+          goal: "Harden the edge gateway with strict CORS policies, HSTS/CSP headers, and TLS certificates.",
+          concept: "Understand browser CORS preflight, edge TLS termination vs. internal mTLS, and OWASP API headers.",
+          lab: "Configure centralized CORS in api-gateway and generate self-signed PKCS12 certs to serve HTTPS locally.",
+          failure: "Verify duplicate CORS headers are stripped and disallowed origins receive explicit 403 rejections.",
+          commit: "Push edge TLS/CORS configuration and security header checklist."
+        },
+        {
+          day: 19, phase: 2,
+          title: "API Idempotency Keys at the Edge",
+          goal: "Prevent duplicate orders or double charges when mobile clients retry timed-out POST requests.",
+          concept: "Study idempotency key lifecycles, request payload hashing, and atomic lock/replay semantics.",
+          lab: "Implement an Idempotency-Key interceptor backed by Redis/PostgreSQL on POST /api/v1/orders.",
+          failure: "Fire concurrent duplicate POSTs with the same key and verify only one order is created while returning identical 201.",
+          commit: "Commit idempotency filter, concurrency test, and ADR-004 on safe retries."
+        },
+        {
+          day: 20, phase: 2,
+          title: "Edge Routing Chaos Drill & Phase 2 Review",
+          goal: "Validate gateway resilience, dynamic config reload, and service failover under synthetic load.",
+          concept: "Review edge bottlenecks, timeout budgets (Gateway > Client > DB), and cascading retry storms.",
+          lab: "Run a k6 or wrk load script through api-gateway while cycling downstream service replicas.",
+          failure: "Confirm zero dropped requests during graceful shutdown (server.shutdown=graceful) and clean 503 handling.",
+          commit: "Tag v2.0-phase2 and document gateway timeout budgets and Phase 2 lessons learned."
+        },
+
+        // ==================== PHASE 3: EVENT-DRIVEN ARCHITECTURE & APACHE KAFKA (DAYS 21-30) ====================
+        {
+          day: 21, phase: 3,
+          title: "Event-Driven Fundamentals & Kafka Internals",
+          goal: "Master Kafka topics, partitions, offsets, consumer groups, and KRaft cluster architecture.",
+          concept: "Distinguish Commands, Domain Events, and Event-Carried State Transfer; study Kafka log segments.",
+          lab: "Spin up a Kafka KRaft broker + Kafka UI in Docker Compose and create partitioned order.events topics.",
+          failure: "Inspect partition rebalancing when adding/removing a consumer instance in the same consumer group.",
+          commit: "Commit Kafka Docker Compose stack and partition sizing calculation notes."
+        },
+        {
+          day: 22, phase: 3,
+          title: "Spring Kafka Producers & Delivery Guarantees",
+          goal: "Configure reliable Kafka producers with acks=all, idempotence, and deterministic partition keys.",
+          concept: "Study at-most-once, at-least-once, and exactly-once semantics; min.insync.replicas and enable.idempotence.",
+          lab: "Publish OrderCreatedEvent from order-service keyed by orderId using KafkaTemplate with CompletableFuture callbacks.",
+          failure: "Simulate broker unavailability and verify delivery.timeout.ms, retries, and clean error reporting.",
+          commit: "Push Kafka producer config, event records, and producer acknowledgment notes."
+        },
+        {
+          day: 23, phase: 3,
+          title: "Kafka Consumers, Offset Commits & Concurrency",
+          goal: "Build scalable, thread-safe Kafka consumers with manual acknowledgment and controlled concurrency.",
+          concept: "Understand poll loops, max.poll.interval.ms, cooperative sticky rebalancing, and manual vs. auto commits.",
+          lab: "Implement @KafkaListener in inventory-service with AckMode.MANUAL_IMMEDIATE and concurrency matching partitions.",
+          failure: "Simulate slow message processing exceeding max.poll.interval.ms and tune max.poll.records to stop rebalance storms.",
+          commit: "Commit inventory Kafka consumer and concurrency tuning configuration."
+        },
+        {
+          day: 24, phase: 3,
+          title: "Schema Registry, Avro & Schema Evolution",
+          goal: "Enforce strongly typed, backward-compatible event contracts across independently deployed services.",
+          concept: "Compare JSON Schema, Avro, and Protobuf; study BACKWARD, FORWARD, and FULL compatibility modes.",
+          lab: "Add Confluent Schema Registry, define OrderCreated.avsc, and wire KafkaAvroSerializer/Deserializer.",
+          failure: "Attempt to register an incompatible breaking Avro change and verify Schema Registry rejects it immediately.",
+          commit: "Push Avro schemas, generated classes, and ADR-005 on event schema evolution."
+        },
+        {
+          day: 25, phase: 3,
+          title: "Dead Letter Topics (DLT) & Non-Blocking Retries",
+          goal: "Isolate poison-pill messages without stalling healthy partition consumption.",
+          concept: "Study DefaultErrorHandler, exponential backoff, @RetryableTopic non-blocking retry topics, and DLT replay.",
+          lab: "Configure @RetryableTopic(attempts = '4', backoff = ...) in payment-service with a dedicated DLT handler.",
+          failure: "Publish a malformed deserialization payload and a transient failure; verify poison pill routes cleanly to DLT.",
+          commit: "Commit retry/DLT topology, DLT inspection endpoint, and poison-pill tests."
+        },
+        {
+          day: 26, phase: 3,
+          title: "Transactional Outbox Pattern",
+          goal: "Eliminate the dual-write bug between PostgreSQL commits and Kafka event publishing.",
+          concept: "Understand why DB commit + kafkaTemplate.send() is non-atomic and how an outbox table guarantees atomicity.",
+          lab: "Add an outbox_events table in order-service, write domain state + outbox row in one @Transactional boundary, and relay.",
+          failure: "Force Kafka offline while creating orders; confirm orders commit safely and events drain once Kafka recovers.",
+          commit: "Push Outbox entity, relay publisher with SKIP LOCKED, and atomicity integration test."
+        },
+        {
+          day: 27, phase: 3,
+          title: "Change Data Capture (CDC) with Debezium",
+          goal: "Replace polling outbox relays with low-latency PostgreSQL WAL streaming via Debezium.",
+          concept: "Learn PostgreSQL logical replication, WAL, Debezium Outbox Event Router SMT, and operational trade-offs.",
+          lab: "Run Kafka Connect with the Debezium Postgres connector streaming order-service outbox_events to Kafka.",
+          failure: "Monitor WAL disk growth when connector is paused and document replication slot alerting thresholds.",
+          commit: "Commit Debezium connector JSON config and polling-vs-CDC trade-off matrix."
+        },
+        {
+          day: 28, phase: 3,
+          title: "Idempotent Consumers & Deduplication Store",
+          goal: "Make every Kafka consumer safe under at-least-once redelivery and event replay.",
+          concept: "Study natural idempotency vs. processed_events table with unique event_id constraint in the same transaction.",
+          lab: "Implement an IdempotentEventProcessor in inventory-service storing event_id alongside stock deduction.",
+          failure: "Replay the exact same OrderCreatedEvent 5 times and assert inventory stock is decremented only once.",
+          commit: "Commit deduplication table migration, idempotent consumer logic, and replay test."
+        },
+        {
+          day: 29, phase: 3,
+          title: "Kafka Streams & Stateful Windowing",
+          goal: "Compute real-time streaming analytics such as per-product order velocity and fraud alerts.",
+          concept: "Study KStream vs. KTable, RocksDB state stores, tumbling/hopping windows, and changelog topics.",
+          lab: "Build an analytics-service with Spring Kafka Streams aggregating 1-minute tumbling order totals per SKU.",
+          failure: "Test late-arriving out-of-order events using grace periods and verify state store recovery after restart.",
+          commit: "Push Kafka Streams topology and TopologyTestDriver unit tests."
+        },
+        {
+          day: 30, phase: 3,
+          title: "Event Mesh Testing & Phase 3 Review",
+          goal: "Verify end-to-end asynchronous flows deterministically using Testcontainers Kafka and Awaitility.",
+          concept: "Review event choreography pitfalls, observability of async chains, and consumer lag monitoring.",
+          lab: "Write an end-to-end Kafka Testcontainers test using Awaitility asserting Order -> Inventory -> Payment flow.",
+          failure: "Simulate consumer crash mid-batch and confirm zero lost events and zero duplicate charges upon recovery.",
+          commit: "Tag v3.0-phase3 and summarize Kafka reliability patterns in your architecture handbook."
+        },
+
+        // ==================== PHASE 4: DISTRIBUTED DATA, SAGA, CQRS & REDIS (DAYS 31-40) ====================
+        {
+          day: 31, phase: 4,
+          title: "Distributed Consistency: CAP, PACELC & BASE",
+          goal: "Reason rigorously about eventual consistency, stale reads, and compensating transactions.",
+          concept: "Study CAP, PACELC, linearizability vs. causal consistency, and why 2PC/XA fails at microservice scale.",
+          lab: "Document consistency SLAs for Order (strong local), Inventory (pessimistic/optimistic), and Catalog (eventual).",
+          failure: "Trace a network partition scenario between order-service and payment-service and define exact UX fallback.",
+          commit: "Commit ADR-006 detailing consistency guarantees per bounded context."
+        },
+        {
+          day: 32, phase: 4,
+          title: "Choreography-Based Saga Pattern",
+          goal: "Coordinate multi-service order fulfillment purely through domain events and compensating actions.",
+          concept: "Map happy-path and rollback event chains: OrderCreated -> StockReserved -> PaymentFailed -> ReleaseStock.",
+          lab: "Wire choreography listeners across order, inventory, and payment services with explicit OrderCancelled compensation.",
+          failure: "Trigger an insufficient-funds PaymentFailedEvent and verify inventory stock is automatically restored.",
+          commit: "Push choreography saga implementation and sequence diagram for rollback paths."
+        },
+        {
+          day: 33, phase: 4,
+          title: "Orchestration-Based Saga State Machine",
+          goal: "Manage complex multi-step workflows with explicit state tracking, timeouts, and pivot transactions.",
+          concept: "Compare Choreography vs. Orchestration; learn semantic locks, pivot steps, and retryable vs. compensatable steps.",
+          lab: "Build a persistent OrderSagaOrchestrator table/state machine driving ReserveStock -> ChargeCard -> ConfirmOrder.",
+          failure: "Crash the orchestrator midway between Payment and Confirmation; verify recovery scheduler resumes cleanly.",
+          commit: "Commit saga orchestrator state machine, transition tests, and choreography-vs-orchestration ADR."
+        },
+        {
+          day: 34, phase: 4,
+          title: "CQRS: Separating Command & Query Models",
+          goal: "Optimize complex read views independently from transactional write schemas.",
+          concept: "Understand simple CQRS (separate services/DTOs) vs. full dual-store CQRS with materialized projections.",
+          lab: "Create an order-query-service maintaining denormalized CustomerOrderView projections updated from Kafka events.",
+          failure: "Test out-of-order projection events (e.g., Shipped arriving before Created) using version numbers/upserts.",
+          commit: "Push CQRS query projection service and event-ordering resilience tests."
+        },
+        {
+          day: 35, phase: 4,
+          title: "Event Sourcing Fundamentals in Java",
+          goal: "Persist an immutable append-only event stream as the source of truth for an aggregate.",
+          concept: "Study aggregate rehydration, optimistic concurrency via stream version, snapshots, and upcasting.",
+          lab: "Prototype an EventSourcedWallet aggregate in payment-service with append-only event_store and balance replay.",
+          failure: "Simulate two concurrent withdrawals on the same aggregate version and verify optimistic lock rejection.",
+          commit: "Commit event-sourced aggregate prototype, snapshot benchmark, and trade-off notes."
+        },
+        {
+          day: 36, phase: 4,
+          title: "Distributed Caching Patterns with Redis",
+          goal: "Cut read latency and database load using Cache-Aside, TTL jitter, and safe cache invalidation.",
+          concept: "Compare Cache-Aside, Read-Through, Write-Through, and Write-Behind; study cache stampede & penetration.",
+          lab: "Integrate Spring Cache + Redis in catalog/inventory read paths with JSON serialization and randomized TTL jitter.",
+          failure: "Simulate a hot-key cache expiration under load and mitigate thundering herd using sync=true / single-flight.",
+          commit: "Push Redis caching layer, eviction listeners, and hit-ratio benchmark notes."
+        },
+        {
+          day: 37, phase: 4,
+          title: "Distributed Locking & Concurrency Control",
+          goal: "Prevent overselling flash-sale inventory using optimistic locking and Redis fencing tokens.",
+          concept: "Compare DB @Version optimistic locking, SELECT FOR UPDATE, Redisson locks, and Martin Kleppmann's fencing critique.",
+          lab: "Add JPA @Version with retry-on-OptimisticLockException in inventory-service plus a Redisson distributed lock demo.",
+          failure: "Run 50 concurrent Virtual Threads buying the last 3 items and assert stock never drops below zero.",
+          commit: "Commit concurrency stress test and ADR-007 on DB vs. Redis locking."
+        },
+        {
+          day: 38, phase: 4,
+          title: "Pagination, Search & Read-Replica Routing",
+          goal: "Scale read-heavy microservice queries using keyset pagination and read-only transaction routing.",
+          concept: "Why OFFSET pagination degrades at depth; study cursor/keyset pagination and AbstractRoutingDataSource.",
+          lab: "Implement keyset cursor pagination on GET /api/v1/orders and configure @Transactional(readOnly = true) routing.",
+          failure: "Measure EXPLAIN ANALYZE on deep offset vs. indexed keyset queries across 100k seeded rows.",
+          commit: "Push cursor pagination API, index migrations, and query plan comparison."
+        },
+        {
+          day: 39, phase: 4,
+          title: "JPA Performance, N+1 Queries & HikariCP Tuning",
+          goal: "Eliminate hidden ORM bottlenecks and size database connection pools scientifically.",
+          concept: "Study N+1 detection, @EntityGraph, DTO projections, Open-Session-in-View pitfalls, and HikariCP sizing formula.",
+          lab: "Disable spring.jpa.open-in-view, add datasource-proxy query counting assertions, and tune HikariCP pool settings.",
+          failure: "Trigger connection pool starvation under simulated slow query and observe leakDetectionThreshold alerts.",
+          commit: "Commit query-count test guardrails and HikariCP production configuration."
+        },
+        {
+          day: 40, phase: 4,
+          title: "Data Integrity Audit & Phase 4 Review",
+          goal: "Verify end-to-end Saga rollback, CQRS eventual consistency lag, and cache-DB coherence.",
+          concept: "Review reconciliation jobs, drift detection between write & read models, and backup/restore drills.",
+          lab: "Build a lightweight reconciliation check comparing order-service totals against order-query-service views.",
+          failure: "Drop and rebuild the entire order-query-service projection from Kafka offset 0 to validate replayability.",
+          commit: "Tag v4.0-phase4 and document distributed data recovery playbooks."
+        },
+
+        // ==================== PHASE 5: RESILIENCE, OAUTH2/JWT & OPENTELEMETRY (DAYS 41-50) ====================
+        {
+          day: 41, phase: 5,
+          title: "Circuit Breakers with Resilience4j",
+          goal: "Stop cascading failures by tripping fast when a downstream dependency degrades.",
+          concept: "Study CLOSED, OPEN, and HALF_OPEN states, count vs. time sliding windows, and slow-call thresholds.",
+          lab: "Configure Resilience4j @CircuitBreaker on order-service -> inventory-service calls with clean fallback logic.",
+          failure: "Inject 60% HTTP 500s via WireMock, confirm circuit opens, and verify auto-recovery after waitDurationInOpenState.",
+          commit: "Commit Resilience4j circuit breaker config, state-transition events, and unit tests."
+        },
+        {
+          day: 42, phase: 5,
+          title: "Retries, Jitter, TimeLimiters & Bulkheads",
+          goal: "Combine resilience decorators in the exact right order to avoid retry amplification.",
+          concept: "Learn Resilience4j aspect precedence (Retry -> CircuitBreaker -> RateLimiter -> TimeLimiter -> Bulkhead) and exponential jitter.",
+          lab: "Configure Semaphore/ThreadPool Bulkheads and randomized exponential backoff retries only for transient 5xx/IO exceptions.",
+          failure: "Verify HTTP 400 validation errors are never retried and bulkhead rejection returns 503 without starving other endpoints.",
+          commit: "Push combined resilience stack, aspect-order diagram, and chaos verification tests."
+        },
+        {
+          day: 43, phase: 5,
+          title: "OAuth2 & OIDC with Keycloak / Auth Server",
+          goal: "Centralize authentication and token issuance using standard OAuth2 Authorization Code + PKCE flows.",
+          concept: "Review OAuth2 roles, OIDC ID vs. Access tokens, JWKS key rotation, and stateless JWT validation.",
+          lab: "Run Keycloak in Docker Compose, configure realm/clients/roles, and protect api-gateway as an OAuth2 Resource Server.",
+          failure: "Test expired tokens, invalid signatures, and revoked signing keys against protected gateway routes.",
+          commit: "Commit Keycloak realm export JSON, security filter chain, and token flow diagram."
+        },
+        {
+          day: 44, phase: 5,
+          title: "Zero-Trust Service Security & Method RBAC",
+          goal: "Propagate validated JWT scopes downstream and enforce fine-grained authorization per microservice.",
+          concept: "Compare Token Relay, Client Credentials for M2M calls, and Spring Security @PreAuthorize method security.",
+          lab: "Configure order-service and inventory-service as Resource Servers relaying JWTs and enforcing SCOPE_orders.write.",
+          failure: "Attempt privilege escalation with a read-only token on admin/cancel endpoints and assert HTTP 403 Forbidden.",
+          commit: "Push downstream Resource Server configs and SecurityMockMvc authorization tests."
+        },
+        {
+          day: 45, phase: 5,
+          title: "Structured JSON Logging & MDC Context",
+          goal: "Emit machine-parseable JSON logs enriched with traceId, spanId, service name, and user context.",
+          concept: "Study Spring Boot 3.4 structured logging / Logstash Logback Encoder, PII redaction, and log cardinality.",
+          lab: "Configure JSON logging with automatic traceId/spanId/correlationId fields and aggregate logs in Grafana Loki.",
+          failure: "Verify sensitive fields (card tokens, Authorization headers) are masked before reaching log sinks.",
+          commit: "Commit logback-spring.xml, PII masking filter, and Loki query cheat sheet."
+        },
+        {
+          day: 46, phase: 5,
+          title: "Metrics with Micrometer, Prometheus & Grafana",
+          goal: "Instrument RED (Rate, Errors, Duration) and JVM metrics across every microservice.",
+          concept: "Understand Counters, Gauges, Timers, Histograms/SLOs, and avoiding high-cardinality label explosions.",
+          lab: "Expose /actuator/prometheus, add custom @Observed / Timer order.checkout metrics, and build a Grafana dashboard.",
+          failure: "Detect an intentional high-cardinality tag (userId in metric tag) and refactor it using MeterFilter.",
+          commit: "Push Prometheus scrape config, Grafana dashboard JSON, and custom business metrics."
+        },
+        {
+          day: 47, phase: 5,
+          title: "Distributed Tracing with OpenTelemetry & Tempo",
+          goal: "Follow a single user request end-to-end across Gateway, REST, gRPC, PostgreSQL, and Kafka.",
+          concept: "Learn W3C TraceContext headers, spans, baggage propagation, and head vs. tail sampling strategies.",
+          lab: "Wire Micrometer Tracing + OpenTelemetry OTLP exporter to Grafana Tempo/Jaeger across HTTP and Kafka hops.",
+          failure: "Trace an artificially slow DB query + Kafka DLT failure and pinpoint the exact bottleneck span in Tempo.",
+          commit: "Commit OTel tracing config, Kafka trace propagation setup, and trace waterfall notes."
+        },
+        {
+          day: 48, phase: 5,
+          title: "Health Probes, Graceful Shutdown & SLO Alerts",
+          goal: "Expose accurate liveness/readiness probes so orchestrators route traffic only to healthy pods.",
+          concept: "Distinguish Liveness vs. Readiness vs. Startup probes, why DB down shouldn't trigger liveness restarts, and error budgets.",
+          lab: "Enable management.endpoint.health.probes.enabled=true with custom Kafka/DB readiness indicators and Alertmanager rules.",
+          failure: "Send SIGTERM during active in-flight requests and confirm graceful drain completes before JVM exit.",
+          commit: "Push Actuator probe config, graceful shutdown tuning, and Prometheus alert rules."
+        },
+        {
+          day: 49, phase: 5,
+          title: "Chaos Engineering & GameDay Fault Injection",
+          goal: "Proactively verify system resilience by injecting network latency, packet loss, and service kills.",
+          concept: "Study steady-state hypothesis, blast radius containment, Toxiproxy, and Chaos Mesh principles.",
+          lab: "Insert Toxiproxy between order-service, PostgreSQL, and Kafka; run controlled latency and bandwidth-limit experiments.",
+          failure: "Observe alerts firing, circuit breakers protecting threads, and outbox buffering events with zero data loss.",
+          commit: "Commit Toxiproxy fault scripts and GameDay incident report with remediation actions."
+        },
+        {
+          day: 50, phase: 5,
+          title: "Security & Observability Audit (Phase 5 Review)",
+          goal: "Harden dependencies, verify full trace coverage, and review SLO dashboards end-to-end.",
+          concept: "Review OWASP API Top 10, SBOM generation (CycloneDX), and CVE scanning in Java builds.",
+          lab: "Run OWASP Dependency-Check / Trivy against all modules and verify Actuator endpoints are locked down.",
+          failure: "Confirm /actuator/env and /actuator/heapdump are never exposed publicly through api-gateway.",
+          commit: "Tag v5.0-phase5 and publish your production readiness observability checklist."
+        },
+
+        // ==================== PHASE 6: DOCKER, KUBERNETES, CI/CD & CAPSTONE (DAYS 51-60) ====================
+        {
+          day: 51, phase: 6,
+          title: "Production Dockerfiles, Distroless & Buildpacks",
+          goal: "Package lean, non-root, layer-cached JVM container images for fast builds and minimal attack surface.",
+          concept: "Compare layered JAR multi-stage Dockerfiles, Cloud Native Buildpacks (Paketo), JLink, and Distroless base images.",
+          lab: "Build layered non-root Dockerfiles for all services using Eclipse Temurin JRE 21 Alpine/Distroless and JVM container flags.",
+          failure: "Set -XX:MaxRAMPercentage=75.0 and test container OOM behavior under strict 512Mi memory limits.",
+          commit: "Push optimized multi-stage Dockerfiles, .dockerignore files, and image size comparison."
+        },
+        {
+          day: 52, phase: 6,
+          title: "Kubernetes Core: Deployments, Services & Config",
+          goal: "Deploy the entire Java microservices stack onto a local Kubernetes cluster (kind / k3d / Minikube).",
+          concept: "Study Pods, ReplicaSets, ClusterIP Services, ConfigMaps, Secrets, and resource requests vs. limits.",
+          lab: "Author K8s manifests for api-gateway, order-service, inventory-service, and payment-service with readiness/liveness probes.",
+          failure: "Misconfigure a readiness probe and inspect kubectl describe pod / events to practice rapid triage.",
+          commit: "Commit k8s/ base manifests and local kind cluster bootstrap script."
+        },
+        {
+          day: 53, phase: 6,
+          title: "Ingress, Gateway API & NetworkPolicies",
+          goal: "Control north-south ingress routing and lock down east-west pod-to-pod traffic with zero-trust rules.",
+          concept: "Compare Kubernetes Ingress vs. Gateway API and default-deny NetworkPolicies per namespace.",
+          lab: "Configure Ingress/Gateway API to api-gateway and apply NetworkPolicies allowing only order-service to reach order-db.",
+          failure: "Run a test curl pod from an unauthorized namespace and verify NetworkPolicy drops the connection.",
+          commit: "Push Ingress and NetworkPolicy YAML manifests with traffic-flow verification notes."
+        },
+        {
+          day: 54, phase: 6,
+          title: "Autoscaling: HPA, PDB & Startup Optimization",
+          goal: "Scale Java microservices dynamically under CPU/custom metrics without dropping availability.",
+          concept: "Study HorizontalPodAutoscaler, PodDisruptionBudgets, Spring AOT / CDS (Class Data Sharing) fast startup.",
+          lab: "Add HPA + PDB manifests for order-service and enable JVM AppCDS to cut pod cold-start time.",
+          failure: "Trigger a load spike to watch HPA scale replicas up, then drain a node while verifying PDB preserves availability.",
+          commit: "Commit HPA/PDB manifests, AppCDS Dockerfile update, and startup time benchmarks."
+        },
+        {
+          day: 55, phase: 6,
+          title: "Helm Charts & Kustomize Multi-Env Packaging",
+          goal: "Promote identical container artifacts cleanly across dev, staging, and prod overlays.",
+          concept: "Compare Helm templating vs. Kustomize overlays, immutable image digests, and values schema validation.",
+          lab: "Create a reusable Helm chart (or Kustomize base + dev/prod overlays) for the microservices platform.",
+          failure: "Run helm template / kubeconform validation to catch schema errors and missing resource limits pre-deploy.",
+          commit: "Push Helm chart / Kustomize overlays and environment promotion guide."
+        },
+        {
+          day: 56, phase: 6,
+          title: "CI/CD Pipelines with GitHub Actions & Security Scans",
+          goal: "Automate build, Testcontainers verification, Trivy image scanning, and container publishing per service.",
+          concept: "Study monorepo path-filtered CI workflows, reproducible builds, SBOM attestations, and artifact signing.",
+          lab: "Write a GitHub Actions pipeline running Maven tests, Checkstyle/SpotBugs, Docker build, and Trivy vulnerability scan.",
+          failure: "Introduce a failing ArchUnit rule or HIGH CVE check and verify the pipeline blocks merge automatically.",
+          commit: "Commit .github/workflows/ci.yml and CI caching optimizations."
+        },
+        {
+          day: 57, phase: 6,
+          title: "Progressive Delivery: Canary, Blue-Green & GitOps",
+          goal: "Ship production releases safely with automated traffic shifting and instant rollback.",
+          concept: "Study ArgoCD GitOps reconciliation, Argo Rollouts canary analysis, feature flags, and backward-compatible rollbacks.",
+          lab: "Configure a canary rollout manifest shifting 10% -> 50% -> 100% traffic gated by Prometheus error-rate metrics.",
+          failure: "Deploy a v2 canary with injected 5% HTTP 500s and watch automated analysis abort and roll back to v1.",
+          commit: "Push GitOps/Canary rollout specs and ADR-008 on zero-downtime deployment strategy."
+        },
+        {
+          day: 58, phase: 6,
+          title: "JVM Tuning, Profiling & Cost Optimization",
+          goal: "Profile heap allocations, GC pauses, and CPU flame graphs under sustained production-like load.",
+          concept: "Compare G1GC vs. Generational ZGC in Java 21, JDK Flight Recorder (JFR), and async-profiler flame graphs.",
+          lab: "Run a 10-minute k6 soak test against order-service while recording JFR profiles and inspecting GC pause metrics.",
+          failure: "Identify an allocation hotspot or memory leak in JFR, optimize it, and re-measure p99 latency and heap usage.",
+          commit: "Commit k6 load test suite, JFR tuning flags, and before/after p99 latency table."
+        },
+        {
+          day: 59, phase: 6,
+          title: "Capstone Assembly: End-to-End Production Dress Rehearsal",
+          goal: "Unite Gateway, OAuth2, Order/Inventory/Payment/Query services, Kafka Outbox, Redis, and K8s observability.",
+          concept: "Conduct a Staff-level Production Readiness Review (PRR): SLOs, runbooks, disaster recovery, and blast radius.",
+          lab: "Deploy the complete platform cleanly from scratch and execute full checkout, rollback Saga, and trace walkthroughs.",
+          failure: "Kill Kafka broker, Redis, and a payment pod sequentially during live load to prove self-healing behavior.",
+          commit: "Push unified compose/k8s capstone manifests, architecture diagrams, and operational runbooks."
+        },
+        {
+          day: 60, phase: 6,
+          title: "Architecture Portfolio, System Design Defense & Graduation",
+          goal: "Synthesize 60 days of hands-on Java Microservices mastery into a showcase repository and interview narrative.",
+          concept: "Review all 8 ADRs and practice explaining trade-offs: monolith vs. microservices, sync vs. async, Saga vs. 2PC.",
+          lab: "Polish root README with C4 architecture diagrams, live Grafana/Tempo screenshots, and one-command quickstart.",
+          failure: "Run a fresh clone on a clean environment to guarantee every test, migration, and container starts smoothly.",
+          commit: "Tag v6.0-capstone-complete and celebrate completing the 60-Day Java Microservices Architecture Sprint!"
+        }
+      ];
+
+      /* ----------------------------------------------------------------------
+         2. STATE MANAGEMENT & LOCALSTORAGE PERSISTENCE
+         ---------------------------------------------------------------------- */
+      const STORAGE_KEY = "liquidGlassJavaMicroservices_v1";
+
+      /** Returns local date as YYYY-MM-DD */
+      function getLocalDateISO(dateObj = new Date()) {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+        const d = String(dateObj.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      }
+
+      /** Parse YYYY-MM-DD into local midnight Date */
+      function parseLocalISO(isoStr) {
+        const parts = (isoStr || "").split("-").map(Number);
+        if (parts.length !== 3 || parts.some(isNaN)) {
+          const now = new Date();
+          return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        }
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+      }
+
+      /** Compute which curriculum day (1..60) corresponds to today given startDate */
+      function computeTodayDay(startDateIso) {
+        const start = parseLocalISO(startDateIso);
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const diffDays = Math.floor((todayMidnight - start) / 86400000);
+        return Math.min(60, Math.max(1, diffDays + 1));
+      }
+
+      function loadState() {
+        const fallbackToday = getLocalDateISO();
+        const defaults = {
+          startDate: fallbackToday,
+          selectedDay: 1,
+          wallpaper: "aurora",
+          glassStyle: "clear",
+          tasks: {} // { [day]: [bool, bool, bool, bool] }
+        };
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return defaults;
+          const parsed = JSON.parse(raw);
+          return {
+            startDate: typeof parsed.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.startDate)
+              ? parsed.startDate : defaults.startDate,
+            selectedDay: Number.isInteger(parsed.selectedDay) && parsed.selectedDay >= 1 && parsed.selectedDay <= 60
+              ? parsed.selectedDay : computeTodayDay(parsed.startDate || fallbackToday),
+            wallpaper: ["aurora", "pacific", "solar", "emerald"].includes(parsed.wallpaper)
+              ? parsed.wallpaper : defaults.wallpaper,
+            glassStyle: ["clear", "tinted", "solid"].includes(parsed.glassStyle)
+              ? parsed.glassStyle : defaults.glassStyle,
+            tasks: parsed.tasks && typeof parsed.tasks === "object" ? parsed.tasks : {}
+          };
+        } catch (err) {
+          console.warn("Failed to load saved tracker state:", err);
+          return defaults;
+        }
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (err) {
+          console.warn("Unable to save state to localStorage:", err);
+        }
+      }
+
+      let state = loadState();
+      let activePhaseFilter = "all";
+      const expandedRoadmapDays = new Set([state.selectedDay]);
+      let resetConfirmArmed = false;
+      let resetConfirmTimer = null;
+      let toastTimeout = null;
+
+      /* ----------------------------------------------------------------------
+         3. DOM REFERENCES
+         ---------------------------------------------------------------------- */
+      const el = {
+        body: document.body,
+        stageAmbient: document.getElementById("stageAmbient"),
+        wallpaperLayer: document.getElementById("wallpaperLayer"),
+        statusTime: document.getElementById("statusTime"),
+        lockDateLine: document.getElementById("lockDateLine"),
+        lockClock: document.getElementById("lockClock"),
+        glassToast: document.getElementById("glassToast"),
+        toastIcon: document.getElementById("toastIcon"),
+        toastMessage: document.getElementById("toastMessage"),
+
+        // Countdown Strip
+        ringRoadmapTrigger: document.getElementById("ringRoadmapTrigger"),
+        progressRingCircle: document.getElementById("progressRingCircle"),
+        ringPctText: document.getElementById("ringPctText"),
+        ringDayText: document.getElementById("ringDayText"),
+        cdDays: document.getElementById("cdDays"),
+        cdHours: document.getElementById("cdHours"),
+        cdMins: document.getElementById("cdMins"),
+        cdSecs: document.getElementById("cdSecs"),
+        streakCount: document.getElementById("streakCount"),
+        widgetPhaseBadge: document.getElementById("widgetPhaseBadge"),
+
+        // Routine Live Activity Card
+        routineCard: document.getElementById("routineCard"),
+        liveActivityDot: document.getElementById("liveActivityDot"),
+        cardPhaseLabel: document.getElementById("cardPhaseLabel"),
+        prevDayBtn: document.getElementById("prevDayBtn"),
+        todayBtn: document.getElementById("todayBtn"),
+        nextDayBtn: document.getElementById("nextDayBtn"),
+        cardDayPill: document.getElementById("cardDayPill"),
+        cardCompleteBadge: document.getElementById("cardCompleteBadge"),
+        scrollTasksBadge: document.getElementById("scrollTasksBadge"),
+        cardTopicTitle: document.getElementById("cardTopicTitle"),
+        cardGoalText: document.getElementById("cardGoalText"),
+        cardProgressLabel: document.getElementById("cardProgressLabel"),
+        cardLiquidBar: document.getElementById("cardLiquidBar"),
+        checklistScrollWrap: document.getElementById("checklistScrollWrap"),
+        checklistScrollHint: document.getElementById("checklistScrollHint"),
+        routineChecklist: document.getElementById("routineChecklist"),
+
+        // Sheets & Controls
+        openCustomizeBtn: document.getElementById("openCustomizeBtn"),
+        openRoadmapBtn: document.getElementById("openRoadmapBtn"),
+        customizeBackdrop: document.getElementById("customizeBackdrop"),
+        roadmapBackdrop: document.getElementById("roadmapBackdrop"),
+        startDateInput: document.getElementById("startDateInput"),
+        targetEndDateLabel: document.getElementById("targetEndDateLabel"),
+        resetStartTodayBtn: document.getElementById("resetStartTodayBtn"),
+        resetProgressBtn: document.getElementById("resetProgressBtn"),
+        roadmapStatsSummary: document.getElementById("roadmapStatsSummary"),
+        roadmapScrollHint: document.getElementById("roadmapScrollHint"),
+        toggleExpandAllBtn: document.getElementById("toggleExpandAllBtn"),
+        phaseFilterBar: document.getElementById("phaseFilterBar"),
+        roadmapList: document.getElementById("roadmapList")
+      };
+
+      /* ----------------------------------------------------------------------
+         4. HELPER UTILITIES & PROGRESS CALCULATIONS
+         ---------------------------------------------------------------------- */
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function getDayTasks(dayNum) {
+        const existing = state.tasks[dayNum];
+        if (Array.isArray(existing) && existing.length === 4) {
+          return existing.map(Boolean);
+        }
+        return [false, false, false, false];
+      }
+
+      function getDayDoneCount(dayNum) {
+        return getDayTasks(dayNum).filter(Boolean).length;
+      }
+
+      function isDayComplete(dayNum) {
+        return getDayDoneCount(dayNum) === 4;
+      }
+
+      /** Compute overall completion stats and current active streak */
+      function computeOverallStats() {
+        let completedDays = 0;
+        let completedTasks = 0;
+        for (let d = 1; d <= 60; d++) {
+          const done = getDayDoneCount(d);
+          completedTasks += done;
+          if (done === 4) completedDays++;
+        }
+
+        // Compute streak anchored to today's sprint day or latest completed day
+        const todayDay = computeTodayDay(state.startDate);
+        let streak = 0;
+        let cursor = isDayComplete(todayDay) ? todayDay : (todayDay > 1 && isDayComplete(todayDay - 1) ? todayDay - 1 : 0);
+        if (cursor > 0) {
+          while (cursor >= 1 && isDayComplete(cursor)) {
+            streak++;
+            cursor--;
+          }
+        } else {
+          // Fallback: count consecutive completed days ending at the highest completed day
+          let highestComplete = 0;
+          for (let d = 60; d >= 1; d--) {
+            if (isDayComplete(d)) {
+              highestComplete = d;
+              break;
+            }
+          }
+          let ptr = highestComplete;
+          while (ptr >= 1 && isDayComplete(ptr)) {
+            streak++;
+            ptr--;
+          }
+        }
+
+        const pct = Math.round((completedTasks / 240) * 100);
+        return { completedDays, completedTasks, pct, streak };
+      }
+
+      function showToast(message, icon = "✨") {
+        el.toastIcon.textContent = icon;
+        el.toastMessage.textContent = message;
+        el.glassToast.classList.add("show");
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+          el.glassToast.classList.remove("show");
+        }, 2300);
+      }
+
+      /* ----------------------------------------------------------------------
+         5. LIVE LOCK SCREEN CLOCK & 60-DAY COUNTDOWN ENGINE
+         ---------------------------------------------------------------------- */
+      function updateClockAndCountdown() {
+        const now = new Date();
+
+        // Status Bar Time (e.g., 6:26)
+        const h12 = now.getHours() % 12 || 12;
+        const minsPadded = String(now.getMinutes()).padStart(2, "0");
+        el.statusTime.textContent = `${h12}:${minsPadded}`;
+
+        // Lock Screen Glass Clock (24h sleek Apple style, e.g., 18:26)
+        const hh = String(now.getHours()).padStart(2, "0");
+        el.lockClock.textContent = `${hh}:${minsPadded}`;
+
+        // Formatted Date Line (e.g., Sunday, November 22)
+        try {
+          el.lockDateLine.textContent = now.toLocaleDateString(undefined, {
+            weekday: "long",
+            month: "long",
+            day: "numeric"
+          });
+        } catch (err) {
+          el.lockDateLine.textContent = now.toDateString();
+        }
+
+        // Live 60-Day Countdown from Start Date (Target = Start Date + 60 full days)
+        const startMidnight = parseLocalISO(state.startDate);
+        const targetEnd = new Date(startMidnight.getTime() + 60 * 86400000);
+        const diffMs = Math.max(0, targetEnd.getTime() - now.getTime());
+
+        const days = Math.floor(diffMs / 86400000);
+        const hours = Math.floor((diffMs % 86400000) / 3600000);
+        const mins = Math.floor((diffMs % 3600000) / 60000);
+        const secs = Math.floor((diffMs % 60000) / 1000);
+
+        el.cdDays.textContent = String(days);
+        el.cdHours.textContent = String(hours).padStart(2, "0");
+        el.cdMins.textContent = String(mins).padStart(2, "0");
+        el.cdSecs.textContent = String(secs).padStart(2, "0");
+      }
+
+      /* ----------------------------------------------------------------------
+         6. RENDERING: APPEARANCE, WIDGET STRIP, DAILY ROUTINE CARD & ROADMAP
+         ---------------------------------------------------------------------- */
+      function applyAppearance() {
+        el.body.setAttribute("data-glass", state.glassStyle);
+        el.wallpaperLayer.setAttribute("data-wp", state.wallpaper);
+        el.stageAmbient.setAttribute("data-wp", state.wallpaper);
+
+        // Update active state on glass style buttons
+        document.querySelectorAll(".glass-mode-btn").forEach((btn) => {
+          const active = btn.getAttribute("data-set-glass") === state.glassStyle;
+          btn.classList.toggle("bg-white", active);
+          btn.classList.toggle("text-slate-900", active);
+          btn.classList.toggle("border-white", active);
+          btn.classList.toggle("bg-white/10", !active);
+          btn.classList.toggle("text-white", !active);
+          btn.classList.toggle("border-white/15", !active);
+          const sub = btn.querySelector("div:last-child");
+          if (sub) {
+            sub.classList.toggle("text-slate-700", active);
+            sub.classList.toggle("text-white/65", !active);
+          }
+        });
+
+        // Update active state on wallpaper buttons
+        document.querySelectorAll(".wp-choice-btn").forEach((btn) => {
+          const active = btn.getAttribute("data-set-wp") === state.wallpaper;
+          btn.classList.toggle("ring-2", active);
+          btn.classList.toggle("ring-white", active);
+          btn.classList.toggle("bg-white/22", active);
+          btn.classList.toggle("bg-white/10", !active);
+        });
+
+        // Sync Start Date input and Target End Date preview
+        el.startDateInput.value = state.startDate;
+        const start = parseLocalISO(state.startDate);
+        const endDate = new Date(start.getTime() + 59 * 86400000);
+        try {
+          el.targetEndDateLabel.textContent = endDate.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric"
+          });
+        } catch (err) {
+          el.targetEndDateLabel.textContent = getLocalDateISO(endDate);
+        }
+      }
+
+      function renderCountdownStrip() {
+        const stats = computeOverallStats();
+        const item = CURRICULUM[state.selectedDay - 1];
+        const circumference = 2 * Math.PI * 25; // r = 25 => 157.08
+        const offset = circumference * (1 - stats.pct / 100);
+
+        el.progressRingCircle.style.strokeDasharray = circumference.toFixed(2);
+        el.progressRingCircle.style.strokeDashoffset = offset.toFixed(2);
+        el.ringPctText.textContent = `${stats.pct}%`;
+        el.ringDayText.textContent = `Day ${state.selectedDay}/60`;
+        el.streakCount.textContent = String(stats.streak);
+        el.widgetPhaseBadge.textContent = `Phase ${item.phase}`;
+      }
+
+      function renderDailyRoutineCard(justCheckedIndex = -1) {
+        const item = CURRICULUM[state.selectedDay - 1];
+        const phase = PHASES[item.phase - 1];
+        const taskStates = getDayTasks(item.day);
+        const doneCount = taskStates.filter(Boolean).length;
+        const pct = (doneCount / 4) * 100;
+
+        // Header & metadata
+        el.cardPhaseLabel.textContent = `Phase ${phase.id} · ${phase.short}`;
+        el.cardPhaseLabel.className = `text-[10.5px] font-bold uppercase tracking-[0.14em] truncate ${phase.accent}`;
+        el.liveActivityDot.className = `w-2 h-2 rounded-full shrink-0 shadow-[0_0_8px_currentColor] ${phase.dot}`;
+
+        el.cardDayPill.textContent = `Day ${item.day} / 60`;
+        el.cardTopicTitle.textContent = item.title;
+        el.cardGoalText.textContent = item.goal;
+
+        el.cardCompleteBadge.classList.toggle("hidden", doneCount !== 4);
+        el.cardCompleteBadge.classList.toggle("inline-flex", doneCount === 4);
+
+        el.cardProgressLabel.textContent = `${doneCount} / 4 Done`;
+        el.cardLiquidBar.style.width = `${pct}%`;
+
+        // Navigation button disabled states
+        el.prevDayBtn.disabled = state.selectedDay <= 1;
+        el.prevDayBtn.classList.toggle("opacity-40", state.selectedDay <= 1);
+        el.nextDayBtn.disabled = state.selectedDay >= 60;
+        el.nextDayBtn.classList.toggle("opacity-40", state.selectedDay >= 60);
+
+        // Preserve scroll position inside #routineChecklist when toggling tasks
+        const prevScroll = el.routineChecklist.scrollTop;
+
+        el.routineChecklist.innerHTML = ROUTINE_SLOTS.map((slot, idx) => {
+          const checked = taskStates[idx];
+          const text = item[slot.key];
+          const animClass = idx === justCheckedIndex && checked ? "just-checked" : "";
+          return `
+            <button
+              type="button"
+              role="listitem"
+              data-task-idx="${idx}"
+              aria-pressed="${checked ? "true" : "false"}"
+              class="routine-row ${checked ? "completed" : ""} ${animClass} w-full shrink-0 text-left px-3.5 py-3 flex items-start gap-3 focus:outline-none"
+            >
+              <!-- Tactile Liquid Glass Checkbox -->
+              <span class="mt-0.5 w-5 h-5 rounded-full shrink-0 flex items-center justify-center border transition-all duration-300 ${
+                checked
+                  ? "bg-emerald-400 border-emerald-200 text-slate-950 shadow-[0_0_10px_rgba(52,211,153,0.65)] scale-105"
+                  : "bg-white/10 border-white/35 text-transparent"
+              }">
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+
+              <!-- Category • Duration Pill, Action Title & Actionable Sub-Detail -->
+              <span class="flex-1 min-w-0">
+                <span class="flex items-center justify-between gap-2 mb-1">
+                  <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${slot.badgeClass} tabular-nums">
+                    ${escapeHtml(slot.label)} &bull; ${slot.duration}
+                  </span>
+                  <span class="text-[10px] font-semibold tabular-nums ${checked ? "text-emerald-200" : "text-white/50"}">
+                    ${checked ? "Done" : `Step ${idx + 1}/4`}
+                  </span>
+                </span>
+                <span class="block text-[12.5px] font-semibold leading-snug ${checked ? "line-through text-white/50" : "text-white/95"}">
+                  ${escapeHtml(text)}
+                </span>
+                <span class="block text-[10.5px] leading-snug mt-1 ${checked ? "text-white/38" : "text-white/62"}">
+                  ${escapeHtml(slot.subDetail)}
+                </span>
+              </span>
+            </button>
+          `;
+        }).join("");
+
+        el.routineChecklist.scrollTop = prevScroll;
+        requestAnimationFrame(updateChecklistScrollCues);
+      }
+
+      /** Dynamically toggle top/bottom scroll shadow cues, scroll badge & bottom hint pill */
+      function updateChecklistScrollCues() {
+        const list = el.routineChecklist;
+        const wrap = el.checklistScrollWrap;
+        if (!list || !wrap) return;
+
+        const hasOverflow = list.scrollHeight > list.clientHeight + 4;
+        const canScrollTop = hasOverflow && list.scrollTop > 6;
+        const canScrollBottom = hasOverflow && (list.scrollTop + list.clientHeight < list.scrollHeight - 8);
+
+        wrap.classList.toggle("can-scroll-top", canScrollTop);
+        wrap.classList.toggle("can-scroll-bottom", canScrollBottom);
+
+        if (el.scrollTasksBadge) {
+          el.scrollTasksBadge.classList.toggle("hidden", !hasOverflow);
+          el.scrollTasksBadge.classList.toggle("inline-flex", hasOverflow);
+        }
+      }
+
+      function selectDay(dayNum, closeRoadmap = false) {
+        const clamped = Math.min(60, Math.max(1, dayNum));
+        state.selectedDay = clamped;
+        expandedRoadmapDays.add(clamped);
+        saveState();
+
+        renderCountdownStrip();
+        renderDailyRoutineCard(-1);
+
+        // Smoothly reset #routineChecklist scroll position when switching days
+        try {
+          el.routineChecklist.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (err) {
+          el.routineChecklist.scrollTop = 0;
+        }
+        requestAnimationFrame(updateChecklistScrollCues);
+
+        if (closeRoadmap) {
+          closeSheet("roadmapBackdrop");
+          showToast(`Loaded Day ${clamped} · ${CURRICULUM[clamped - 1].title.slice(0, 26)}…`, "📅");
+        }
+      }
+
+      /** Toggle one of the 4 daily routine tasks for any day and sync all views */
+      function toggleTask(dayNum, taskIndex, fromRoadmap = false) {
+        if (dayNum < 1 || dayNum > 60 || taskIndex < 0 || taskIndex > 3) return;
+
+        const current = getDayTasks(dayNum);
+        const wasComplete = current.every(Boolean);
+        current[taskIndex] = !current[taskIndex];
+        state.tasks[dayNum] = current;
+        saveState();
+
+        const nowChecked = current[taskIndex];
+        const nowComplete = current.every(Boolean);
+
+        // Refresh countdown ring, streak badge, and active Lock Screen routine card
+        renderCountdownStrip();
+        if (dayNum === state.selectedDay) {
+          renderDailyRoutineCard(nowChecked ? taskIndex : -1);
+        }
+        if (fromRoadmap || el.roadmapBackdrop.classList.contains("open")) {
+          renderRoadmap(true);
+        }
+
+        // Celebratory feedback when a full day (4/4) is completed
+        if (!wasComplete && nowComplete) {
+          const item = CURRICULUM[dayNum - 1];
+          const phaseDays = CURRICULUM.filter((d) => d.phase === item.phase);
+          const phaseMastered = phaseDays.every((d) => isDayComplete(d.day));
+          if (dayNum === 60 && computeOverallStats().completedDays === 60) {
+            showToast("All 60 Days Mastered! Sprint Complete!", "🏆");
+          } else if (phaseMastered) {
+            showToast(`Phase ${item.phase} Complete! Outstanding work!`, "🚀");
+          } else {
+            showToast(`Day ${dayNum} Complete! Streak updated.`, "🎉");
+          }
+        }
+      }
+
+      /* ----------------------------------------------------------------------
+         7. 60-DAY ROADMAP SHEET (Filterable, Scrollable, Inline Expandable Tasks)
+         ---------------------------------------------------------------------- */
+      function getFilteredCurriculum() {
+        if (activePhaseFilter === "all") return CURRICULUM;
+        const pId = Number(activePhaseFilter);
+        return CURRICULUM.filter((d) => d.phase === pId);
+      }
+
+      function renderPhaseFilterBar() {
+        const pills = [
+          { id: "all", label: "All 60" },
+          ...PHASES.map((p) => ({ id: String(p.id), label: `Phase ${p.id}` }))
+        ];
+
+        el.phaseFilterBar.innerHTML = pills.map((p) => {
+          const active = String(activePhaseFilter) === p.id;
+          return `
+            <button
+              type="button"
+              data-phase-filter="${p.id}"
+              class="px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition active:scale-95 shrink-0 border ${
+                active
+                  ? "bg-white text-slate-950 border-white shadow-sm"
+                  : "bg-white/10 text-white/80 border-white/15 hover:bg-white/20"
+              }"
+            >
+              ${escapeHtml(p.label)}
+            </button>
+          `;
+        }).join("");
+      }
+
+      function renderRoadmap(preserveScroll = false) {
+        const prevScroll = preserveScroll ? el.roadmapList.scrollTop : 0;
+        const stats = computeOverallStats();
+        const filtered = getFilteredCurriculum();
+
+        el.roadmapStatsSummary.textContent = `${stats.completedDays} of 60 days mastered · ${stats.completedTasks}/240 tasks`;
+
+        // Update scroll hint & Expand/Collapse button label
+        const visibleCount = filtered.length;
+        const allExpanded = visibleCount > 0 && filtered.every((item) => expandedRoadmapDays.has(item.day));
+        el.toggleExpandAllBtn.textContent = allExpanded ? "Collapse Tasks" : "Expand Tasks";
+        el.roadmapScrollHint.textContent = `Showing ${visibleCount} ${visibleCount === 1 ? "day" : "days"} • Scroll for more`;
+
+        renderPhaseFilterBar();
+
+        // Group filtered days by phase
+        const phasesToShow = activePhaseFilter === "all"
+          ? PHASES
+          : PHASES.filter((p) => p.id === Number(activePhaseFilter));
+
+        el.roadmapList.innerHTML = phasesToShow.map((phase) => {
+          const phaseDays = filtered.filter((d) => d.phase === phase.id);
+          const phaseCompleteCount = phaseDays.filter((d) => isDayComplete(d.day)).length;
+
+          const dayRowsHtml = phaseDays.map((item) => {
+            const taskStates = getDayTasks(item.day);
+            const doneCount = taskStates.filter(Boolean).length;
+            const complete = doneCount === 4;
+            const isSelected = item.day === state.selectedDay;
+            const isExpanded = expandedRoadmapDays.has(item.day);
+
+            const miniDots = taskStates.map((done) =>
+              `<span class="w-1.5 h-1.5 rounded-full ${done ? "bg-emerald-400" : "bg-white/20"}"></span>`
+            ).join("");
+
+            const expandedTasksHtml = isExpanded ? `
+              <div class="mt-2.5 pt-2.5 border-t border-white/12 flex flex-col gap-1.5">
+                ${ROUTINE_SLOTS.map((slot, idx) => {
+                  const checked = taskStates[idx];
+                  return `
+                    <button
+                      type="button"
+                      data-roadmap-task-day="${item.day}"
+                      data-roadmap-task-idx="${idx}"
+                      aria-pressed="${checked ? "true" : "false"}"
+                      class="w-full text-left rounded-[14px] px-2.5 py-2 flex items-start gap-2 border transition active:scale-[0.985] ${
+                        checked
+                          ? "bg-emerald-400/14 border-emerald-300/35"
+                          : "bg-white/6 hover:bg-white/12 border-white/10"
+                      }"
+                    >
+                      <span class="mt-0.5 w-4 h-4 rounded-full shrink-0 flex items-center justify-center border ${
+                        checked
+                          ? "bg-emerald-400 border-emerald-200 text-slate-950"
+                          : "bg-white/10 border-white/30 text-transparent"
+                      }">
+                        <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      </span>
+                      <span class="flex-1 min-w-0">
+                        <span class="flex items-center justify-between gap-1.5">
+                          <span class="text-[10.5px] font-bold ${checked ? "text-emerald-200" : "text-white/90"}">${escapeHtml(slot.label)}</span>
+                          <span class="text-[9px] font-semibold text-white/55 tabular-nums">${slot.duration}</span>
+                        </span>
+                        <span class="block text-[11px] leading-snug mt-0.5 ${checked ? "line-through text-white/45" : "text-white/75"}">
+                          ${escapeHtml(item[slot.key])}
+                        </span>
+                      </span>
+                    </button>
+                  `;
+                }).join("")}
+              </div>
+            ` : "";
+
+            return `
+              <div class="rounded-[20px] p-2.5 border transition ${
+                isSelected
+                  ? "bg-white/16 border-sky-300/55 shadow-[0_0_0_1px_rgba(56,189,248,0.22)]"
+                  : complete
+                    ? "bg-emerald-400/10 border-emerald-300/30"
+                    : "bg-white/8 border-white/12 hover:bg-white/12"
+              }">
+                <div class="flex items-center gap-2">
+                  <!-- Tap Header to Expand/Collapse Inline 4-Task Checklist -->
+                  <button
+                    type="button"
+                    data-expand-day="${item.day}"
+                    aria-expanded="${isExpanded ? "true" : "false"}"
+                    class="flex-1 min-w-0 flex items-center gap-2.5 text-left focus:outline-none"
+                  >
+                    <span class="w-8 h-8 rounded-[12px] shrink-0 flex items-center justify-center text-[11px] font-bold tabular-nums border ${
+                      complete
+                        ? "bg-emerald-400/25 border-emerald-300/45 text-emerald-100"
+                        : isSelected
+                          ? "bg-sky-400/25 border-sky-300/50 text-sky-100"
+                          : "bg-white/10 border-white/15 text-white/90"
+                    }">
+                      ${complete ? "✓" : `D${item.day}`}
+                    </span>
+
+                    <span class="flex-1 min-w-0">
+                      <span class="flex items-center gap-1.5">
+                        <span class="text-[12px] font-bold text-white truncate">${escapeHtml(item.title)}</span>
+                      </span>
+                      <span class="flex items-center gap-2 mt-0.5">
+                        <span class="inline-flex items-center gap-1">${miniDots}</span>
+                        <span class="text-[10px] font-semibold text-white/60 tabular-nums">${doneCount}/4 tasks</span>
+                      </span>
+                    </span>
+
+                    <svg class="roadmap-chevron ${isExpanded ? "expanded" : ""} w-4 h-4 text-white/60 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+
+                  <!-- Open Day Directly on Lock Screen -->
+                  <button
+                    type="button"
+                    data-open-day="${item.day}"
+                    class="px-2.5 py-1.5 rounded-full text-[10.5px] font-bold shrink-0 transition active:scale-90 ${
+                      isSelected
+                        ? "bg-white text-slate-950"
+                        : "bg-white/14 hover:bg-white/25 text-white border border-white/18"
+                    }"
+                  >
+                    ${isSelected ? "Active" : "Open"}
+                  </button>
+                </div>
+
+                ${expandedTasksHtml}
+              </div>
+            `;
+          }).join("");
+
+          return `
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center justify-between px-1 pt-0.5">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="w-2 h-2 rounded-full ${phase.dot} shrink-0"></span>
+                  <span class="text-[11px] font-bold uppercase tracking-[0.12em] ${phase.accent} truncate">
+                    Phase ${phase.id} · ${escapeHtml(phase.short)}
+                  </span>
+                </div>
+                <span class="text-[10px] font-semibold text-white/60 tabular-nums shrink-0">
+                  ${phase.range} · ${phaseCompleteCount}/10
+                </span>
+              </div>
+              <div class="flex flex-col gap-2">
+                ${dayRowsHtml}
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        el.roadmapList.scrollTop = preserveScroll ? prevScroll : 0;
+      }
+
+      /* ----------------------------------------------------------------------
+         8. MODAL SHEETS & SPECULAR GLASS CURSOR/TOUCH SHEEN
+         ---------------------------------------------------------------------- */
+      function openSheet(backdropId) {
+        const sheet = document.getElementById(backdropId);
+        if (!sheet) return;
+        if (backdropId === "roadmapBackdrop") {
+          expandedRoadmapDays.add(state.selectedDay);
+          renderRoadmap(false);
+        }
+        sheet.classList.add("open");
+      }
+
+      function closeSheet(backdropId) {
+        const sheet = document.getElementById(backdropId);
+        if (sheet) sheet.classList.remove("open");
+        disarmResetConfirm();
+      }
+
+      function disarmResetConfirm() {
+        resetConfirmArmed = false;
+        clearTimeout(resetConfirmTimer);
+        el.resetProgressBtn.textContent = "Reset Progress";
+        el.resetProgressBtn.classList.remove("bg-rose-500", "text-white");
+        el.resetProgressBtn.classList.add("bg-rose-500/20", "text-rose-200");
+      }
+
+      function bindGlassSpecularSheen() {
+        const glassPanels = document.querySelectorAll(".liquid-glass");
+        const updatePos = (panel, clientX, clientY) => {
+          const rect = panel.getBoundingClientRect();
+          const x = ((clientX - rect.left) / rect.width) * 100;
+          const y = ((clientY - rect.top) / rect.height) * 100;
+          panel.style.setProperty("--mx", `${x.toFixed(1)}%`);
+          panel.style.setProperty("--my", `${y.toFixed(1)}%`);
+          panel.style.setProperty("--sheen-active", "0.75");
+        };
+
+        glassPanels.forEach((panel) => {
+          panel.addEventListener("pointermove", (e) => updatePos(panel, e.clientX, e.clientY));
+          panel.addEventListener("pointerleave", () => {
+            panel.style.setProperty("--sheen-active", "0.42");
+          });
+        });
+      }
+
+      /* ----------------------------------------------------------------------
+         9. EVENT LISTENERS (Clicks, Touch Swipes, Keyboard Navigation)
+         ---------------------------------------------------------------------- */
+      function bindEvents() {
+        // Routine Card: Check/uncheck 4 daily tasks
+        el.routineChecklist.addEventListener("click", (e) => {
+          const btn = e.target.closest("[data-task-idx]");
+          if (!btn) return;
+          const idx = Number(btn.getAttribute("data-task-idx"));
+          if (!Number.isNaN(idx)) toggleTask(state.selectedDay, idx, false);
+        });
+
+        // Update dynamic scroll shadow cues & bottom hint pill on #routineChecklist scroll
+        el.routineChecklist.addEventListener("scroll", updateChecklistScrollCues, { passive: true });
+        window.addEventListener("resize", updateChecklistScrollCues, { passive: true });
+
+        // Day navigation arrows + Today button
+        el.prevDayBtn.addEventListener("click", () => {
+          if (state.selectedDay > 1) selectDay(state.selectedDay - 1);
+        });
+        el.nextDayBtn.addEventListener("click", () => {
+          if (state.selectedDay < 60) selectDay(state.selectedDay + 1);
+        });
+        el.todayBtn.addEventListener("click", () => {
+          const todayDay = computeTodayDay(state.startDate);
+          selectDay(todayDay);
+          showToast(`Jumped to Today (Day ${todayDay})`, "📍");
+        });
+
+        // Horizontal touch swipe navigation (strictly ignores vertical scrolling gestures)
+        let swipeStartX = 0;
+        let swipeStartY = 0;
+        el.routineCard.addEventListener("touchstart", (e) => {
+          if (e.touches.length !== 1) return;
+          swipeStartX = e.touches[0].clientX;
+          swipeStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        el.routineCard.addEventListener("touchend", (e) => {
+          if (e.changedTouches.length !== 1) return;
+          const dx = e.changedTouches[0].clientX - swipeStartX;
+          const dy = e.changedTouches[0].clientY - swipeStartY;
+          if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.6) {
+            if (dx < 0 && state.selectedDay < 60) selectDay(state.selectedDay + 1);
+            if (dx > 0 && state.selectedDay > 1) selectDay(state.selectedDay - 1);
+          }
+        }, { passive: true });
+
+        // Open Customize & Roadmap Sheets
+        el.openCustomizeBtn.addEventListener("click", () => openSheet("customizeBackdrop"));
+        el.openRoadmapBtn.addEventListener("click", () => openSheet("roadmapBackdrop"));
+        el.ringRoadmapTrigger.addEventListener("click", () => openSheet("roadmapBackdrop"));
+
+        // Close Sheet buttons & backdrop tap-to-dismiss
+        document.querySelectorAll("[data-close-sheet]").forEach((btn) => {
+          btn.addEventListener("click", () => closeSheet(btn.getAttribute("data-close-sheet")));
+        });
+        [el.customizeBackdrop, el.roadmapBackdrop].forEach((backdrop) => {
+          backdrop.addEventListener("click", (e) => {
+            if (e.target === backdrop) closeSheet(backdrop.id);
+          });
+        });
+
+        // Glass Style selector
+        document.querySelectorAll("[data-set-glass]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.glassStyle = btn.getAttribute("data-set-glass");
+            saveState();
+            applyAppearance();
+          });
+        });
+
+        // Wallpaper selector
+        document.querySelectorAll("[data-set-wp]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.wallpaper = btn.getAttribute("data-set-wp");
+            saveState();
+            applyAppearance();
+          });
+        });
+
+        // Start Date configuration
+        el.startDateInput.addEventListener("change", () => {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(el.startDateInput.value)) {
+            state.startDate = el.startDateInput.value;
+            saveState();
+            applyAppearance();
+            updateClockAndCountdown();
+            renderCountdownStrip();
+            showToast("Sprint Start Date updated", "🗓️");
+          }
+        });
+
+        el.resetStartTodayBtn.addEventListener("click", () => {
+          state.startDate = getLocalDateISO();
+          state.selectedDay = 1;
+          saveState();
+          applyAppearance();
+          updateClockAndCountdown();
+          renderCountdownStrip();
+          renderDailyRoutineCard(-1);
+          showToast("Sprint anchored to Today (Day 1)", "🎯");
+        });
+
+        // Two-Tap Safe Progress Reset (Zero alert()/confirm())
+        el.resetProgressBtn.addEventListener("click", () => {
+          if (!resetConfirmArmed) {
+            resetConfirmArmed = true;
+            el.resetProgressBtn.textContent = "Tap Again to Confirm";
+            el.resetProgressBtn.classList.remove("bg-rose-500/20", "text-rose-200");
+            el.resetProgressBtn.classList.add("bg-rose-500", "text-white");
+            clearTimeout(resetConfirmTimer);
+            resetConfirmTimer = setTimeout(disarmResetConfirm, 3600);
+          } else {
+            state.tasks = {};
+            state.selectedDay = computeTodayDay(state.startDate);
+            saveState();
+            disarmResetConfirm();
+            renderCountdownStrip();
+            renderDailyRoutineCard(-1);
+            if (el.roadmapBackdrop.classList.contains("open")) renderRoadmap(false);
+            showToast("All 60-day progress cleared", "🧹");
+          }
+        });
+
+        // Roadmap: Phase Filter Pills
+        el.phaseFilterBar.addEventListener("click", (e) => {
+          const pill = e.target.closest("[data-phase-filter]");
+          if (!pill) return;
+          activePhaseFilter = pill.getAttribute("data-phase-filter");
+          renderRoadmap(false);
+        });
+
+        // Roadmap: Expand All / Collapse All visible phase tasks
+        el.toggleExpandAllBtn.addEventListener("click", () => {
+          const visible = getFilteredCurriculum();
+          const allExpanded = visible.length > 0 && visible.every((item) => expandedRoadmapDays.has(item.day));
+          if (allExpanded) {
+            visible.forEach((item) => expandedRoadmapDays.delete(item.day));
+          } else {
+            visible.forEach((item) => expandedRoadmapDays.add(item.day));
+          }
+          renderRoadmap(true);
+        });
+
+        // Roadmap: Expand/Collapse day, Check inline task, or Open day on Lock Screen
+        el.roadmapList.addEventListener("click", (e) => {
+          // 1. Inline task toggle inside expanded roadmap day
+          const inlineTaskBtn = e.target.closest("[data-roadmap-task-day]");
+          if (inlineTaskBtn) {
+            const d = Number(inlineTaskBtn.getAttribute("data-roadmap-task-day"));
+            const idx = Number(inlineTaskBtn.getAttribute("data-roadmap-task-idx"));
+            if (!Number.isNaN(d) && !Number.isNaN(idx)) {
+              toggleTask(d, idx, true);
+            }
+            return;
+          }
+
+          // 2. Open Day button
+          const openBtn = e.target.closest("[data-open-day]");
+          if (openBtn) {
+            const d = Number(openBtn.getAttribute("data-open-day"));
+            if (!Number.isNaN(d)) selectDay(d, true);
+            return;
+          }
+
+          // 3. Expand/Collapse Day header
+          const expandBtn = e.target.closest("[data-expand-day]");
+          if (expandBtn) {
+            const d = Number(expandBtn.getAttribute("data-expand-day"));
+            if (!Number.isNaN(d)) {
+              if (expandedRoadmapDays.has(d)) {
+                expandedRoadmapDays.delete(d);
+              } else {
+                expandedRoadmapDays.add(d);
+              }
+              renderRoadmap(true);
+            }
+          }
+        });
+
+        // Keyboard shortcuts (Escape closes sheets; Left/Right switch days when sheets closed)
+        document.addEventListener("keydown", (e) => {
+          const sheetOpen =
+            el.customizeBackdrop.classList.contains("open") ||
+            el.roadmapBackdrop.classList.contains("open");
+
+          if (e.key === "Escape" && sheetOpen) {
+            closeSheet("customizeBackdrop");
+            closeSheet("roadmapBackdrop");
+            return;
+          }
+          if (!sheetOpen && document.activeElement.tagName !== "INPUT") {
+            if (e.key === "ArrowLeft" && state.selectedDay > 1) selectDay(state.selectedDay - 1);
+            if (e.key === "ArrowRight" && state.selectedDay < 60) selectDay(state.selectedDay + 1);
+          }
+        });
+      }
+
+      /* ----------------------------------------------------------------------
+         10. INITIALIZATION
+         ---------------------------------------------------------------------- */
+      function init() {
+        applyAppearance();
+        updateClockAndCountdown();
+        renderCountdownStrip();
+        renderDailyRoutineCard(-1);
+        bindGlassSpecularSheen();
+        bindEvents();
+        requestAnimationFrame(updateChecklistScrollCues);
+
+        // Keep Lock Screen clock & 60-day countdown live every second
+        setInterval(updateClockAndCountdown, 1000);
+      }
+
+      window.addEventListener("DOMContentLoaded", init);
+    })();
+  </script>
+</body>
+</html>
